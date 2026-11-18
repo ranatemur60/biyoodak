@@ -8129,7 +8129,7 @@ s=2
 return A.R(A.ahI(),$async$a_d)
 case 2:s=3
 return A.R(A.ahW(A.b([B.I4],t.UW)),$async$a_d)
-case 3:q=A.fv($.e4.b9().a.h(0,"onboarded"))
+case 3:q=A.fv($.e4.b9().a.h(0,"onboarded_v2"))
 if(q===!0){q=A.fv($.e4.b9().a.h(0,"breakAlerts"))
 q=q!==!1}else q=!1
 if(q)A.OF(A.Cv().a)
@@ -44901,7 +44901,7 @@ $S:497}
 A.qn.prototype={
 an(){return new A.Wq()}}
 A.Wq.prototype={
-H(a){var s=A.fv($.e4.b9().a.h(0,"onboarded"))
+H(a){var s=A.fv($.e4.b9().a.h(0,"onboarded_v2"))
 if(s!==!0)return A.ld(null,A.n9(!0,new A.uB(!0,new A.at0(this),null),!1,B.ao,!0),null)
 return B.OO}}
 A.at0.prototype={
@@ -45558,7 +45558,7 @@ s=2
 return A.R($.e4.b9().ot("String","profile",B.bz.AN(p.eR(),null)),$async$qG)
 case 2:s=q.a.c?3:4
 break
-case 3:$.e4.b9().ot("Bool","onboarded",!0)
+case 3:$.e4.b9().ot("Bool","onboarded_v2",!0)
 s=5
 return A.R(A.aeU(),$async$qG)
 case 5:p=A.fv($.e4.b9().a.h(0,"breakAlerts"))
