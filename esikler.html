@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NeuroVibe Eşik Değerleri</title>
+<meta name="description" content="NeuroVibe uygulamasında yorgunluğun nasıl belirlendiği ve PERCLOS, rPPG, odak kaybı ve tepki hızı eşik değerleri.">
+<style>
+:root{--bg:#fff;--fg:#1E1B3A;--muted:#6B6880;--line:#E0DCEB;--head:#EAE4FF;--card:#F6F4FB;--p:#7B4FF5;--g:#22B573;--y:#C99400;--r:#E5484D}
+@media (prefers-color-scheme: dark){:root{--bg:#14121F;--fg:#ECEAF5;--muted:#A9A6BC;--line:#34304A;--head:#2B2450;--card:#1D1A2C;--p:#A98BFF;--g:#3DD68C;--y:#F2C94C;--r:#FF6B70}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:920px;margin:0 auto;padding:28px 16px 48px}
+header{background:linear-gradient(120deg,#7B4FF5,#B062F0,#F77AA7);color:#fff;border-radius:24px;padding:24px}
+header h1{margin:0 0 6px;font-size:26px;line-height:1.25}
+header p{margin:0;opacity:.95}
+h2{font-size:20px;margin:32px 0 10px}
+p{margin:8px 0}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:14px;margin:12px 0}
+table{border-collapse:collapse;width:100%;min-width:640px;font-size:14.5px}
+th,td{padding:10px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:var(--head);font-weight:700}
+tr:last-child td{border-bottom:0}
+.g{color:var(--g);font-weight:700}.y{color:var(--y);font-weight:700}.r{color:var(--r);font-weight:700}
+ul{padding-left:20px}li{margin:4px 0}
+.formula{background:var(--card);border-radius:14px;padding:14px 16px;font-weight:600;overflow-x:auto}
+.note{background:var(--card);border-radius:14px;padding:14px 16px;color:var(--muted);font-size:14.5px}
+ol li{margin:6px 0;font-size:14.5px}
+a{color:var(--p)}
+footer{margin-top:32px;color:var(--muted);font-size:13.5px}
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>NeuroVibe: Yorgunluk Belirleme Yöntemi ve Eşik Değerleri</h1>
+<p>TÜBİTAK 2204-A · Bilişsel Yorgunluk Karnesi · 18.11.2026</p>
+</header>
+
+<h2>Yorgunluk neye göre belirleniyor?</h2>
+<p>Uygulama yorgunluğu tek bir ölçüme göre değil, dört göstergenin ağırlıklı ortalamasıyla (Bileşik Yorgunluk Skoru, 0-100) belirler. Her gösterge önce kendi eşiklerine göre 0-100 arası bir puana çevrilir; yüksek puan dinç ve odaklı olmak demektir.</p>
+<div class="tw"><table>
+<tr><th>Gösterge</th><th>Neyi ölçer</th><th>Nasıl ölçülür</th><th>Ağırlık</th></tr>
+<tr><td>Göz (PERCLOS)</td><td>Göz kapağının kapalı kaldığı sürenin yüzdesi</td><td>Ön kamera, yüz yer işaretleri, Göz En-Boy Oranı (EAR)</td><td>%40</td></tr>
+<tr><td>Tepki hızı</td><td>Uyarana dokunma süresi, kaçırılan uyaranlar, hatalı dokunuşlar, bildirime tepki</td><td>Go/No-Go testi (yeşil daire: dokun, mor kare: bekle) ve test sırasında gelen sahte bildirim</td><td>%28</td></tr>
+<tr><td>Nabız (rPPG)</td><td>Kişisel dinlenik nabızdan sapma ve HRV (RMSSD)</td><td>Alın bölgesinin yeşil kanal renk değişimi, 45 sn kayıt, 0,7-3,5 Hz bant geçiren filtre, Fourier dönüşümü</td><td>%20</td></tr>
+<tr><td>Odak kaybı (bakış kayması)</td><td>Yüzün ekrandan uzaklaştığı sürenin yüzdesi</td><td>Baş yönelimi (sağ-sol ve aşağı-yukarı açı) ve yüzün görünürlüğü</td><td>%12</td></tr>
+</table></div>
+<p>Sadece tamamlanan ölçümler hesaba katılır; ağırlıklar tamamlanan modüllere göre yeniden oranlanır. Renkli göstergenin çıkması için göz analizi, tepki hızı ve odaklanmadan en az ikisi tamamlanmalıdır. Kişi en az 3 ölçüm yaptıktan sonra tepki süresi ve nabız eşikleri kişinin kendi geçmiş ortalamasına göre ayarlanır (kişisel kalibrasyon).</p>
+
+<h2>Eşik değerleri</h2>
+<p>Aşağıdaki sınırlar uygulamanın kodunda kullanılan değerlerin aynısıdır. Renk sınırları, gösterge puanının 80 ve 50 olduğu noktalara karşılık gelir (cezalar eklenmeden önce).</p>
+<div class="tw"><table>
+<tr><th>Gösterge</th><th>Ölçülen değer</th><th class="g">Yeşil (dinç)</th><th class="y">Sarı (hafif yorgunluk)</th><th class="r">Kırmızı (yüksek yorgunluk)</th><th>Ek kurallar</th></tr>
+<tr><td>PERCLOS</td><td>Gözün kapalı kaldığı süre (%)</td><td>≤ %8,4</td><td>%8,4 - %15</td><td>&gt; %15</td><td>Göz kapalı sayılır: EAR &lt; açık göz EAR'ı × 0,6 (açık göz EAR'ı = kişinin ölçüm sırasındaki 85. yüzdelik değeri). Göz kırpma = 40-1500 ms süren kapanma. Dakikada 35'ten fazla göz kırpma: -10 puan</td></tr>
+<tr><td>Tepki hızı</td><td>Ortanca tepki süresi (ms)</td><td>≤ 368 ms</td><td>368 - 500 ms</td><td>&gt; 500 ms</td><td>500 ms üzeri yanıt veya 1,5 sn içinde yanıt yok = gecikme (lapse), her biri -10 puan. Mor kareye ya da erken dokunma: her biri -3 puan (en fazla -20). Bildirime tepki 900 ms'den uzunsa 2500 ms'de -15'e kadar ceza; bildirim kaçırılırsa -10</td></tr>
+<tr><td>Nabız (rPPG)</td><td>Kişisel dinlenik nabızdan artış (BPM)</td><td>≤ +13 BPM</td><td>+13 - +26 BPM</td><td>&gt; +26 BPM</td><td>Kişisel değer yoksa 75 BPM alınır. Nabız 110 BPM üzeri: -15 puan. HRV (RMSSD) 20 ms altı: -10 puan. Nabız ancak SNR &gt; -9 dB ve sinyal kalitesi ≥ %20 ise puanlanır</td></tr>
+<tr><td>Odak kaybı</td><td>Ekrandan uzaklaşılan süre (%)</td><td>≤ %13</td><td>%13 - %33</td><td>&gt; %33</td><td>Odak dışı sayılır: baş sağa-sola 25°'den, aşağı-yukarı 22°'den fazla dönmüş ya da yüz görünmüyor</td></tr>
+<tr><td>Bileşik skor</td><td>0-100</td><td>80 - 100</td><td>50 - 79</td><td>0 - 49</td><td>Ekranda Yeşil, Sarı, Kırmızı renk göstergesi olarak gösterilir</td></tr>
+</table></div>
+<p>Nabız için ayrıca stres etiketi verilir: kişisel değerden artış 20 BPM'yi veya nabız 105 BPM'yi geçerse "Yüksek", artış 8 BPM'yi geçerse "Orta", aksi halde "Düşük".</p>
+
+<h2>Puanlama formülleri</h2>
+<p>Her gösterge iki noktası belli doğrusal geçişlerle puanlanır, sonra 0-100 aralığına sınırlanır.</p>
+<ul>
+<li><b>Göz puanı:</b> PERCLOS ≤ %4 → 100, %15 → 50, %30 → 0.</li>
+<li><b>Tepki puanı:</b> ortanca süre ≤ 280 ms → 100, 500 ms → 50, 800 ms → 0. Kişinin kendi ortalamasından %10'dan fazla yavaşsa en fazla -25 puan ek ceza.</li>
+<li><b>Nabız puanı:</b> kişisel değerden artış ≤ +5 BPM → 100, +30 BPM → 40.</li>
+<li><b>Odak puanı:</b> 100 − 1,5 × odak dışı yüzdesi.</li>
+</ul>
+<div class="formula">Bileşik Skor = (0,40·G + 0,28·T + 0,12·O + 0,20·N) ÷ (tamamlanan modüllerin ağırlık toplamı)</div>
+<p>G = göz, T = tepki, O = odak, N = nabız puanı. Güven Skoru, tamamlanan modüllerin veri kalitesinin ortalamasıdır (yüz görünme oranı, kamera kare hızı, nabız SNR'si, yanıtlanan uyaran oranı).</p>
+<p class="note">Bu eşikler literatürdeki bulgulardan esinlenerek proje ekibi tarafından belirlenmiştir; tıbbi tanı eşiği değildir. PERCLOS için %15 sınırı yorgunluk araştırmalarında sık kullanılan düzeye, tepki hızındaki 500 ms gecikme sınırı Psikomotor Uyanıklık Testi (PVT) tanımına dayanır. Telefonda dokunma ve ekran gecikmesi nedeniyle tepki süreleri laboratuvar değerlerinden yüksek çıkabilir.</p>
+
+<h2>Kaynaklar</h2>
+<ol>
+<li>Wierwille, W. W., &amp; Ellsworth, L. A. (1994). Evaluation of driver fatigue and drowsiness measures. <i>Human Factors</i>, 36(1), 71-87. <a href="https://doi.org/10.1177/001872089403600106">doi:10.1177/001872089403600106</a> (PERCLOS)</li>
+<li>Dinges, D. F., &amp; Powell, J. W. (1985). Microcomputer analyses of performance on a portable, simple visual RT task during sustained operations. <i>Behavior Research Methods, Instruments, &amp; Computers</i>, 17(6), 652-655. <a href="https://doi.org/10.3758/BF03200977">doi:10.3758/BF03200977</a> (PVT, 500 ms gecikme)</li>
+<li>Verkruysse, W., Svaasand, L. O., &amp; Nelson, J. S. (2008). Remote plethysmographic imaging using ambient light. <i>Optics Express</i>, 16(26), 21434-21445. <a href="https://doi.org/10.1364/OE.16.021434">doi:10.1364/OE.16.021434</a> (rPPG, yeşil kanal)</li>
+<li>de Haan, G., &amp; Jeanne, V. (2013). Robust pulse rate from chrominance-based rPPG. <i>IEEE Transactions on Biomedical Engineering</i>, 60(10), 2878-2886. <a href="https://doi.org/10.1109/TBME.2013.2266196">doi:10.1109/TBME.2013.2266196</a> (SNR hesabı)</li>
+<li>Woods, D. L. ve ark. (2015). Factors influencing the latency of simple reaction time. <i>Frontiers in Human Neuroscience</i>, 9, 131. <a href="https://doi.org/10.3389/fnhum.2015.00131">doi:10.3389/fnhum.2015.00131</a> (tepki süresi karşılaştırma düzeyi)</li>
+</ol>
+<footer>NeuroVibe · Uygulama: <a href="./">ranatemur60.github.io/biyoodak</a> · Bu uygulama tıbbi tanı aracı değildir.</footer>
+</main>
+</body>
+</html>
