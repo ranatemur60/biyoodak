@@ -160,7 +160,9 @@ class _MeasureScreenState extends State<MeasureScreen> {
       await v.start();
       sub = v.samples.listen(_onSample, onError: (Object e) {
         if (mounted) {
-          setState(() => visionError = e.toString().replaceFirst('Exception: ', ''));
+          debugPrint('Yüz analizi hatası: $e');
+          setState(() => visionError =
+              'Yüz analizi başlatılamadı. Uygulamayı kapatıp yeniden açmayı dene.');
         }
       });
       setState(() => phase = _Phase.waitingFace);
