@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import '../analysis/scoring.dart';
 import '../models.dart';
 import '../services/screen_time.dart';
+import '../services/session.dart';
 import '../services/storage.dart';
 import '../vision/vision_source.dart';
 import '../widgets/common.dart';
@@ -17,18 +18,79 @@ const kLightConditions = [
   'Arkadan ışık',
 ];
 
-/// 45 saniyelik eş zamanlı ölçüm: PERCLOS + rPPG + reaksiyon/bildirim tepkisi
-/// + bakış kayması.
+/// Ölçüm türleri: tam ölçüm veya tek tek modüller.
+enum MeasureMode { full, pulse, eye, reaction }
+
+class _ModeInfo {
+  final String title, cardTitle, emoji;
+  final double seconds;
+  final List<Color> colors;
+  final Color accent;
+  final String howTo;
+  const _ModeInfo(this.title, this.cardTitle, this.emoji, this.seconds,
+      this.colors, this.accent, this.howTo);
+}
+
+const _modes = {
+  MeasureMode.full: _ModeInfo(
+      'Tam Ölçüm',
+      'Göz • Nabız • Dikkat',
+      '🧠',
+      45,
+      gPurple,
+      kPrimary,
+      'Telefonu sabit bir yere yasla, yüzün 30-40 cm uzakta olsun. 45 saniye boyunca ekrana bak. '
+          'Yeşil daire belirdiğinde ekrana dokun. Mor kareyi gördüğünde bekle. Üstten bildirim gelirse ona dokun.'),
+  MeasureMode.pulse: _ModeInfo(
+      'Nabız Ölçümü',
+      'Nabız analizi',
+      '❤️',
+      45,
+      gPink,
+      kPink,
+      'Yüzünü çerçevenin içinde tut. Ölçüm 45 saniye sürer. Bu sürede konuşma ve başını sabit tut. '
+          'Yüzünün önden aydınlık olması ölçümü iyileştirir.'),
+  MeasureMode.eye: _ModeInfo(
+      'Göz Analizi',
+      'Göz analizi',
+      '👁️',
+      30,
+      gBlue,
+      kTeal,
+      'Yüzünü çerçevenin içinde tut ve 30 saniye boyunca normal şekilde ekrana bak. '
+          'Göz kırpmalarını bastırmaya çalışma.'),
+  MeasureMode.reaction: _ModeInfo(
+      'Tepki Hızı',
+      'Tepki hızı',
+      '⚡',
+      30,
+      gOrange,
+      kOrange,
+      'Yeşil daire belirdiğinde ekranın herhangi bir yerine hızlıca dokun. '
+          'Mor kareyi gördüğünde bekle, dokunma. Üstten bildirim gelirse ona dokun.'),
+};
+
 class MeasureScreen extends StatefulWidget {
-  const MeasureScreen({super.key});
+  final MeasureMode mode;
+  const MeasureScreen({super.key, this.mode = MeasureMode.full});
   @override
   State<MeasureScreen> createState() => _MeasureScreenState();
 }
 
 enum _Phase { intro, starting, waitingFace, countdown, recording, fatigue, done }
 
+class _Stim {
+  final double t;
+  final bool go;
+  _Stim(this.t, this.go);
+}
+
 class _MeasureScreenState extends State<MeasureScreen> {
-  static const durationMs = 45000.0;
+  late final _ModeInfo info = _modes[widget.mode]!;
+  double get durationMs => info.seconds * 1000;
+  bool get hasStimuli =>
+      widget.mode == MeasureMode.full || widget.mode == MeasureMode.reaction;
+
   _Phase phase = _Phase.intro;
   String light = kLightConditions[0];
   String? error;
@@ -39,15 +101,15 @@ class _MeasureScreenState extends State<MeasureScreen> {
   Timer? ticker;
   int countdown = 3;
   bool faceNow = false;
-  double lastFaceT = -1;
   int fatigue = 5;
 
-  // Uyaranlar
+  // Go/No-Go uyaranları
   final rnd = math.Random();
-  List<double> stimTimes = [];
+  List<_Stim> stims = [];
   double notifTime = 0;
   int nextStim = 0;
-  double? stimShownAt; // stopwatch ms
+  double? stimShownAt;
+  bool stimGo = true;
   Offset stimPos = const Offset(0.5, 0.5);
   bool notifVisible = false;
   bool notifDone = false;
@@ -62,18 +124,27 @@ class _MeasureScreenState extends State<MeasureScreen> {
   }
 
   void _schedule() {
-    // 6 uyaran 4-42 sn arasında, en az 4 sn aralıkla; bildirim 15-35 sn arasında
-    stimTimes = [];
-    notifTime = 15000 + rnd.nextDouble() * 20000;
-    var t = 3000.0;
-    while (stimTimes.length < 6) {
-      t += 4000 + rnd.nextDouble() * 2500;
-      if (t > 42000) break;
-      if ((t - notifTime).abs() < 2500) t += 2500;
-      stimTimes.add(t);
-    }
+    stims = [];
     nextStim = 0;
-    notifDone = false;
+    notifDone = !hasStimuli;
+    if (!hasStimuli) return;
+    final end = durationMs - 3000;
+    notifTime = durationMs * (0.35 + rnd.nextDouble() * 0.4);
+    final gap = widget.mode == MeasureMode.full ? 4000.0 : 2600.0;
+    var t = 2500.0;
+    while (true) {
+      t += gap + rnd.nextDouble() * 1800;
+      if (t > end) break;
+      if ((t - notifTime).abs() < 2500) t += 2500;
+      if (t > end) break;
+      stims.add(_Stim(t, true));
+    }
+    // Yaklaşık %25'i "bekle" (mor kare); ilk uyaran her zaman yeşil.
+    final nogo = (stims.length / 4).round();
+    final idx = List<int>.generate(stims.length - 1, (i) => i + 1)..shuffle(rnd);
+    for (final i in idx.take(nogo)) {
+      stims[i] = _Stim(stims[i].t, false);
+    }
   }
 
   Future<void> _start() async {
@@ -87,7 +158,6 @@ class _MeasureScreenState extends State<MeasureScreen> {
       await v.start();
       sub = v.samples.listen(_onSample);
       setState(() => phase = _Phase.waitingFace);
-      // En fazla 15 sn yüz bekle
       final deadline = DateTime.now().add(const Duration(seconds: 15));
       while (mounted && phase == _Phase.waitingFace) {
         if (faceNow) {
@@ -95,19 +165,16 @@ class _MeasureScreenState extends State<MeasureScreen> {
           return;
         }
         if (DateTime.now().isAfter(deadline)) {
+          await _cancel();
           setState(() => error =
               'Yüz algılanamadı. Yüzünü çerçevenin ortasına getir ve önden ışık aldığından emin ol.');
-          await _cancel();
           return;
         }
         await Future<void>.delayed(const Duration(milliseconds: 200));
       }
     } catch (e) {
       await _cancel();
-      setState(() {
-        phase = _Phase.intro;
-        error = e.toString().replaceFirst('Exception: ', '');
-      });
+      setState(() => error = e.toString().replaceFirst('Exception: ', ''));
     }
   }
 
@@ -117,6 +184,8 @@ class _MeasureScreenState extends State<MeasureScreen> {
     sub = null;
     await vision?.stop();
     vision = null;
+    stimShownAt = null;
+    notifVisible = false;
     if (mounted) setState(() => phase = _Phase.intro);
   }
 
@@ -126,7 +195,7 @@ class _MeasureScreenState extends State<MeasureScreen> {
       countdown = 3;
     });
     Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) return t.cancel();
+      if (!mounted || phase != _Phase.countdown) return t.cancel();
       if (countdown <= 1) {
         t.cancel();
         _record();
@@ -137,8 +206,19 @@ class _MeasureScreenState extends State<MeasureScreen> {
   }
 
   void _record() {
-    data = SessionData(
+    final d = SessionData(
         start: DateTime.now(), durationMs: durationMs, lightCondition: light);
+    switch (widget.mode) {
+      case MeasureMode.full:
+        d.pulseDone = d.eyeDone = d.reactionDone = true;
+      case MeasureMode.pulse:
+        d.pulseDone = true;
+      case MeasureMode.eye:
+        d.eyeDone = true;
+      case MeasureMode.reaction:
+        d.reactionDone = true;
+    }
+    data = d;
     _schedule();
     sw
       ..reset()
@@ -150,9 +230,7 @@ class _MeasureScreenState extends State<MeasureScreen> {
   double get _now => sw.elapsedMicroseconds / 1000.0;
 
   void _onSample(FrameSample s) {
-    if (s.isLandmark) {
-      faceNow = s.face;
-    }
+    if (s.isLandmark) faceNow = s.face;
     final d = data;
     if (d == null || phase != _Phase.recording) return;
     final t = _now;
@@ -171,23 +249,30 @@ class _MeasureScreenState extends State<MeasureScreen> {
   void _tick() {
     final t = _now;
     final d = data!;
-    // Uyaran zaman aşımı (1.5 sn) → kaçırıldı
-    if (stimShownAt != null && t - stimShownAt! > 1500) {
-      d.reactionMs.add(null);
-      stimShownAt = null;
+    if (stimShownAt != null) {
+      final age = t - stimShownAt!;
+      if (stimGo && age > 1500) {
+        d.reactionMs.add(null); // kaçırıldı
+        stimShownAt = null;
+      } else if (!stimGo && age > 1200) {
+        stimShownAt = null; // doğru bekledi
+      }
     }
-    if (stimShownAt == null && nextStim < stimTimes.length && t >= stimTimes[nextStim]) {
+    if (stimShownAt == null && nextStim < stims.length && t >= stims[nextStim].t) {
+      stimGo = stims[nextStim].go;
+      if (!stimGo) d.nogoTotal++;
       nextStim++;
       stimShownAt = t;
-      stimPos = Offset(0.2 + rnd.nextDouble() * 0.6, 0.35 + rnd.nextDouble() * 0.4);
+      stimPos = Offset(0.2 + rnd.nextDouble() * 0.6, 0.25 + rnd.nextDouble() * 0.4);
     }
     if (!notifDone && !notifVisible && t >= notifTime) {
       notifVisible = true;
       notifShownAt = t;
+      d.notifShown = true;
     }
     if (notifVisible && t - notifShownAt! > 4000) {
       notifVisible = false;
-      notifDone = true; // kaçırıldı
+      notifDone = true;
     }
     if (t >= durationMs) {
       _finishRecording();
@@ -197,13 +282,18 @@ class _MeasureScreenState extends State<MeasureScreen> {
   }
 
   void _onTapScreen() {
-    if (phase != _Phase.recording) return;
+    if (phase != _Phase.recording || !hasStimuli) return;
     final t = _now;
-    if (stimShownAt != null) {
-      data!.reactionMs.add(t - stimShownAt!);
+    final d = data!;
+    if (stimShownAt != null && stimGo) {
+      d.reactionMs.add(t - stimShownAt!);
+      stimShownAt = null;
+    } else if (stimShownAt != null && !stimGo) {
+      d.nogoErrors++;
+      d.falseStarts++;
       stimShownAt = null;
     } else {
-      data!.falseStarts++;
+      d.falseStarts++;
     }
     setState(() {});
   }
@@ -219,10 +309,9 @@ class _MeasureScreenState extends State<MeasureScreen> {
   Future<void> _finishRecording() async {
     ticker?.cancel();
     sw.stop();
-    if (stimShownAt != null) {
-      data!.reactionMs.add(null);
-      stimShownAt = null;
-    }
+    if (stimShownAt != null && stimGo) data!.reactionMs.add(null);
+    stimShownAt = null;
+    notifVisible = false;
     await sub?.cancel();
     sub = null;
     await vision?.stop();
@@ -237,7 +326,15 @@ class _MeasureScreenState extends State<MeasureScreen> {
     final night = (stats.supported && stats.enabled && stats.nightMin > 0)
         ? stats.nightMin.toDouble()
         : profile.nightVideoMinutes.toDouble();
-    final m = computeMeasurement(data!,
+    final d = data!;
+    SessionData acc;
+    if (widget.mode == MeasureMode.full) {
+      CurrentSession.replaceWith(d);
+      acc = d;
+    } else {
+      acc = CurrentSession.accumulator(light)..mergeFrom(d);
+    }
+    final m = computeMeasurement(acc,
         baseline: UserBaseline.fromHistory(Store.history),
         subjectiveFatigue: fatigue,
         nightScreenMin: night);
@@ -250,7 +347,10 @@ class _MeasureScreenState extends State<MeasureScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ölçüm')),
+      appBar: AppBar(
+        title: Text(info.title, style: const TextStyle(fontWeight: FontWeight.w800)),
+        centerTitle: true,
+      ),
       body: switch (phase) {
         _Phase.intro => _intro(),
         _Phase.fatigue => _fatigue(),
@@ -260,109 +360,178 @@ class _MeasureScreenState extends State<MeasureScreen> {
     );
   }
 
-  Widget _intro() => ListView(padding: const EdgeInsets.all(16), children: [
-        const Text('Ölçüm nasıl yapılır?',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+  Widget _intro() => ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 24), children: [
+        GradientCard(
+          colors: info.colors,
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Text(info.emoji, style: const TextStyle(fontSize: 34)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text('${info.title} (${info.seconds.round()} sn)',
+                    style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: kNavy)),
+              ),
+            ]),
+            const SizedBox(height: 14),
+            Text(info.howTo, style: const TextStyle(fontSize: 15.5, height: 1.45, color: kNavy)),
+          ]),
+        ),
+        if (hasStimuli) ...[
+          const SizedBox(height: 16),
+          Row(children: [
+            Expanded(child: _legendBox(true)),
+            const SizedBox(width: 12),
+            Expanded(child: _legendBox(false)),
+          ]),
+        ],
+        const SizedBox(height: 20),
+        const Text('Ortam ışığı', style: TextStyle(fontWeight: FontWeight.w800, color: kNavy, fontSize: 16)),
         const SizedBox(height: 8),
-        const Text('1. Telefonu masaya/standa yasla, yüzün ön kameraya 30-40 cm uzaklıkta olsun.\n'
-            '2. Yüzün önden aydınlık olsun; arkanda pencere veya lamba olmasın.\n'
-            '3. Ölçüm 45 saniye sürer. Bu sürede başını sabit tut ve ekrana bak.\n'
-            '4. Ekranda renkli bir daire belirdiğinde ekranın herhangi bir yerine olabildiğince hızlı dokun.\n'
-            '5. Üstten bir bildirim kayarsa ona dokun.'),
-        const SizedBox(height: 16),
-        const Text('Ortam koşulu (Teknik doğrulama için)',
-            style: TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 6),
-        Wrap(spacing: 6, children: [
+        Wrap(spacing: 8, runSpacing: 8, children: [
           for (final l in kLightConditions)
-            ChoiceChip(label: Text(l), selected: light == l, onSelected: (_) => setState(() => light = l)),
+            ChoiceChip(
+                label: Text(l),
+                selected: light == l,
+                selectedColor: const Color(0xFFEAE4FF),
+                onSelected: (_) => setState(() => light = l)),
         ]),
         if (error != null) ...[
           const SizedBox(height: 16),
-          Card(
-              color: Theme.of(context).colorScheme.errorContainer,
-              child: Padding(padding: const EdgeInsets.all(12), child: Text(error!))),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(color: const Color(0xFFFFE8EA), borderRadius: BorderRadius.circular(18)),
+            child: Text(error!, style: const TextStyle(color: kNavy)),
+          ),
         ],
         const SizedBox(height: 24),
         FilledButton.icon(
             onPressed: _start,
-            icon: const Icon(Icons.play_arrow),
+            icon: const Icon(Icons.play_arrow_rounded),
             label: const Text('Ölçümü Başlat')),
-        const SizedBox(height: 12),
-        const Text(
-            'Kamera görüntüsü kaydedilmez; yalnızca cihaz üzerinde anlık işlenir.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12)),
+        const SizedBox(height: 14),
+        const Text('Kamera görüntüsü kaydedilmez; yalnızca cihaz üzerinde anlık işlenir.',
+            textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: kMuted)),
       ]);
+
+  Widget _legendBox(bool go) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: const Color(0xFFF6F4FB), borderRadius: BorderRadius.circular(20)),
+        child: Row(children: [
+          _shape(go, 30),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(go ? 'Yeşil daire: dokun' : 'Mor kare: bekle',
+                style: const TextStyle(fontWeight: FontWeight.w700, color: kNavy)),
+          ),
+        ]),
+      );
+
+  Widget _shape(bool go, double size) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: go ? kGreen : kPrimary,
+          shape: go ? BoxShape.circle : BoxShape.rectangle,
+          borderRadius: go ? null : BorderRadius.circular(size * 0.18),
+        ),
+      );
 
   Widget _camera() {
     final t = phase == _Phase.recording ? _now : 0.0;
-    final remaining = ((durationMs - t) / 1000).ceil().clamp(0, 45);
+    final remaining = ((durationMs - t) / 1000).ceil().clamp(0, info.seconds.round());
+    final status = switch (phase) {
+      _Phase.starting => 'Kamera hazırlanıyor...',
+      _Phase.waitingFace => 'Yüzünü çerçevenin içine getir',
+      _Phase.countdown => 'Başlıyor: $countdown',
+      _ => faceNow ? 'Ölçülüyor... $remaining sn' : 'Yüz görünmüyor',
+    };
     return Listener(
       behavior: HitTestBehavior.opaque,
       onPointerDown: (e) {
-        // Bildirim alanına dokunma ayrı değerlendirilir
-        if (notifVisible && e.localPosition.dy < 100) {
+        if (notifVisible && e.localPosition.dy < 110) {
           _onTapNotif();
         } else {
           _onTapScreen();
         }
       },
       child: Stack(fit: StackFit.expand, children: [
-        if (vision != null)
-          Center(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: SizedBox(width: 240, height: 320, child: vision!.preview()),
-            ),
-          ),
-        // Yüz kılavuzu
-        IgnorePointer(
-          child: Center(
-            child: Container(
-              width: 180,
-              height: 240,
-              decoration: BoxDecoration(
-                border: Border.all(color: faceNow ? kGreen : kRed, width: 3),
-                borderRadius: const BorderRadius.all(Radius.elliptical(90, 120)),
+        Column(children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: 3 / 4,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: Stack(fit: StackFit.expand, children: [
+                      Container(color: const Color(0xFF14121F)),
+                      if (vision != null) vision!.preview(),
+                      IgnorePointer(
+                        child: Center(
+                          child: FractionallySizedBox(
+                            widthFactor: 0.7,
+                            heightFactor: 0.72,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(color: faceNow ? kTeal : kRed, width: 3),
+                                borderRadius: BorderRadius.circular(36),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-        Positioned(
-          left: 16,
-          right: 16,
-          bottom: 24,
-          child: Column(children: [
-            Text(
-              switch (phase) {
-                _Phase.starting => 'Kamera ve yüz analizi hazırlanıyor...',
-                _Phase.waitingFace => 'Yüzünü çerçevenin içine getir',
-                _Phase.countdown => 'Başlıyor: $countdown',
-                _ => faceNow ? 'Ölçülüyor... $remaining sn' : '⚠️ Yüz görünmüyor',
-              },
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: GradientCard(
+              colors: info.colors,
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('${info.emoji} ${info.cardTitle}',
+                    style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: kNavy)),
+                const SizedBox(height: 10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    minHeight: 9,
+                    value: phase == _Phase.recording ? (t / durationMs).clamp(0, 1) : 0,
+                    color: info.accent,
+                    backgroundColor: Colors.white.withValues(alpha: 0.7),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(status,
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: phase == _Phase.recording && !faceNow ? kRed : kNavy)),
+                if (hasStimuli)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: Text('Yeşil daire belirdiğinde dokun. Mor kareyi gördüğünde bekle.',
+                        style: TextStyle(fontSize: 13.5, color: kMuted)),
+                  ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(onPressed: _cancel, child: const Text('İptal')),
+                ),
+              ]),
             ),
-            const SizedBox(height: 8),
-            if (phase == _Phase.recording)
-              LinearProgressIndicator(value: (t / durationMs).clamp(0, 1)),
-            const SizedBox(height: 8),
-            TextButton(onPressed: _cancel, child: const Text('İptal')),
-          ]),
-        ),
+          ),
+        ]),
         if (stimShownAt != null)
           LayoutBuilder(builder: (ctx, c) {
             return Stack(children: [
               Positioned(
-                left: stimPos.dx * c.maxWidth - 40,
-                top: stimPos.dy * c.maxHeight - 40,
-                child: IgnorePointer(
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    decoration: const BoxDecoration(color: Color(0xFFFF7A00), shape: BoxShape.circle),
-                  ),
-                ),
+                left: stimPos.dx * c.maxWidth - 45,
+                top: stimPos.dy * c.maxHeight - 45,
+                child: IgnorePointer(child: _shape(stimGo, 90)),
               ),
             ]);
           }),
@@ -370,14 +539,15 @@ class _MeasureScreenState extends State<MeasureScreen> {
           duration: const Duration(milliseconds: 250),
           left: 12,
           right: 12,
-          top: notifVisible ? 12 : -120,
+          top: notifVisible ? 10 : -130,
           child: IgnorePointer(
             child: Material(
-              elevation: 6,
-              borderRadius: BorderRadius.circular(14),
+              elevation: 8,
+              borderRadius: BorderRadius.circular(18),
+              color: Colors.white,
               child: const ListTile(
                 leading: Icon(Icons.notifications_active, color: kPrimary),
-                title: Text('BiyoOdak'),
+                title: Text('NeuroVibe', style: TextStyle(fontWeight: FontWeight.w800)),
                 subtitle: Text('Yeni bildirim: dokunarak kapat'),
               ),
             ),
@@ -390,21 +560,24 @@ class _MeasureScreenState extends State<MeasureScreen> {
   Widget _fatigue() => Padding(
         padding: const EdgeInsets.all(24),
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          const Text('😴', style: TextStyle(fontSize: 54)),
+          const SizedBox(height: 12),
           const Text('Kendini şu an ne kadar yorgun hissediyorsun?',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: kNavy)),
           const SizedBox(height: 8),
-          const Text('0: Hiç yorgun değilim · 10: Çok yorgunum'),
-          const SizedBox(height: 16),
-          Text('$fatigue / 10', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+          const Text('0: Hiç yorgun değilim · 10: Çok yorgunum', style: TextStyle(color: kMuted)),
+          const SizedBox(height: 18),
+          Text('$fatigue / 10',
+              style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: kPrimary)),
           Slider(
               value: fatigue.toDouble(),
               min: 0,
               max: 10,
               divisions: 10,
               onChanged: (v) => setState(() => fatigue = v.round())),
-          const SizedBox(height: 16),
-          FilledButton(onPressed: _compute, child: const Text('Sonucu Göster')),
+          const SizedBox(height: 18),
+          FilledButton(onPressed: _compute, child: const Text('Karnemi Göster')),
         ]),
       );
 }

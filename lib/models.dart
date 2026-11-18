@@ -98,6 +98,11 @@ class Measurement {
   final double reactionScore;
   final double focusScore;
   final double composite;
+  final bool pulseDone, eyeDone, reactionDone;
+  final int nogoTotal, nogoErrors;
+
+  /// Renkli gösterge için göz/tepki ölçümlerinden en az biri (+ odak) gerekir.
+  bool get hasIndicator => eyeDone || reactionDone;
 
   // Kalite (Güven Skoru bileşenleri)
   final double eyeQ;
@@ -143,6 +148,11 @@ class Measurement {
     required this.reactionScore,
     required this.focusScore,
     required this.composite,
+    this.pulseDone = true,
+    this.eyeDone = true,
+    this.reactionDone = true,
+    this.nogoTotal = 0,
+    this.nogoErrors = 0,
     required this.eyeQ,
     required this.pulseQ,
     required this.reactionQ,
@@ -195,6 +205,11 @@ class Measurement {
         'reactionScore': reactionScore,
         'focusScore': focusScore,
         'composite': composite,
+        'pulseDone': pulseDone,
+        'eyeDone': eyeDone,
+        'reactionDone': reactionDone,
+        'nogoTotal': nogoTotal,
+        'nogoErrors': nogoErrors,
         'eyeQ': eyeQ,
         'pulseQ': pulseQ,
         'reactionQ': reactionQ,
@@ -243,6 +258,11 @@ class Measurement {
         reactionScore: _d(j['reactionScore']) ?? 0,
         focusScore: _d(j['focusScore']) ?? 0,
         composite: _d(j['composite']) ?? 0,
+        pulseDone: j['pulseDone'] ?? true,
+        eyeDone: j['eyeDone'] ?? true,
+        reactionDone: j['reactionDone'] ?? true,
+        nogoTotal: (j['nogoTotal'] ?? 0) as int,
+        nogoErrors: (j['nogoErrors'] ?? 0) as int,
         eyeQ: _d(j['eyeQ']) ?? 0,
         pulseQ: _d(j['pulseQ']) ?? 0,
         reactionQ: _d(j['reactionQ']) ?? 0,

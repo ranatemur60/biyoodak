@@ -6,10 +6,167 @@ import 'package:material_ui/material_ui.dart';
 import '../analysis/scoring.dart';
 import '../services/recommendations.dart';
 
-const kGreen = Color(0xFF2E9E5B);
-const kYellow = Color(0xFFE8B10C);
-const kRed = Color(0xFFD64545);
-const kPrimary = Color(0xFF4F46E5);
+const kGreen = Color(0xFF22B573);
+const kYellow = Color(0xFFF2B518);
+const kRed = Color(0xFFE5484D);
+const kPrimary = Color(0xFF7B4FF5);
+const kNavy = Color(0xFF1E1B3A);
+const kPink = Color(0xFFE8467C);
+const kTeal = Color(0xFF14C4B8);
+const kOrange = Color(0xFFF5A524);
+const kMuted = Color(0xFF6B6880);
+
+/// NeuroVibe pastel kart renkleri (gradyan başlangıç-bitiş).
+const gPink = [Color(0xFFFFE1EB), Color(0xFFFFF0F5)];
+const gBlue = [Color(0xFFD3F3FF), Color(0xFFEAFBFF)];
+const gOrange = [Color(0xFFFFE6BF), Color(0xFFFFF6E6)];
+const gGreen = [Color(0xFFD4F9E6), Color(0xFFEAFBF5)];
+const gPurple = [Color(0xFFEAE4FF), Color(0xFFF3EFFF)];
+const gMint = [Color(0xFFD5FBEF), Color(0xFFE4F6FD)];
+const gHero = [Color(0xFFF1E8FF), Color(0xFFFFE8F1), Color(0xFFE2F6FF)];
+const gHeader = [Color(0xFF7B4FF5), Color(0xFFB062F0), Color(0xFFF77AA7)];
+
+/// Yuvarlak köşeli, gradyan arka planlı kart.
+class GradientCard extends StatelessWidget {
+  final List<Color> colors;
+  final Widget child;
+  final VoidCallback? onTap;
+  final EdgeInsets padding;
+  final double radius;
+  const GradientCard(
+      {super.key,
+      required this.colors,
+      required this.child,
+      this.onTap,
+      this.padding = const EdgeInsets.all(20),
+      this.radius = 28});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        gradient: LinearGradient(
+            colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+        boxShadow: [
+          BoxShadow(
+              color: colors.first.withValues(alpha: 0.35),
+              blurRadius: 16,
+              offset: const Offset(0, 6)),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(radius),
+          onTap: onTap,
+          child: Padding(padding: padding, child: child),
+        ),
+      ),
+    );
+  }
+}
+
+/// Ana sayfa / Ölçüm Merkezi modül kartı.
+class ModuleCard extends StatelessWidget {
+  final IconData icon;
+  final String title, subtitle;
+  final List<Color> colors;
+  final VoidCallback onTap;
+  const ModuleCard(
+      {super.key,
+      required this.icon,
+      required this.title,
+      required this.subtitle,
+      required this.colors,
+      required this.onTap});
+  @override
+  Widget build(BuildContext context) => GradientCard(
+        colors: colors,
+        onTap: onTap,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Icon(icon, size: 34, color: kNavy),
+          const SizedBox(height: 18),
+          Text(title,
+              style: const TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.w800, color: kNavy)),
+          const SizedBox(height: 10),
+          Text(subtitle, style: const TextStyle(fontSize: 14, color: kMuted)),
+        ]),
+      );
+}
+
+/// Karne metrik kutusu (Nabız, PERCLOS, Tepki Süresi, Odaklanma).
+class MetricTile extends StatelessWidget {
+  final String label;
+  final String? value; // null → Tamamlanmadı
+  final Color color;
+  final List<Color> bg;
+  const MetricTile(
+      {super.key,
+      required this.label,
+      required this.value,
+      required this.color,
+      required this.bg});
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
+        decoration: BoxDecoration(
+            gradient: LinearGradient(colors: bg),
+            borderRadius: BorderRadius.circular(24)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label,
+              style: const TextStyle(
+                  fontWeight: FontWeight.w700, color: kNavy, fontSize: 15)),
+          const SizedBox(height: 12),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(value ?? 'Tamamlanmadı',
+                style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                    fontSize: value == null ? 15 : 26)),
+          ),
+        ]),
+      );
+}
+
+/// NeuroVibe kalp ritmi çizgisi.
+class EcgLine extends StatelessWidget {
+  final double width;
+  const EcgLine({super.key, this.width = 220});
+  @override
+  Widget build(BuildContext context) => SizedBox(
+      width: width, height: 30, child: CustomPaint(painter: _EcgPainter()));
+}
+
+class _EcgPainter extends CustomPainter {
+  @override
+  void paint(Canvas c, Size s) {
+    final p = Paint()
+      ..color = kPrimary
+      ..strokeWidth = 3
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final path = Path()..moveTo(0, s.height * 0.6);
+    final seg = s.width / 3;
+    for (var i = 0; i < 3; i++) {
+      final x = i * seg + seg * 0.12;
+      path
+        ..lineTo(x, s.height * 0.6)
+        ..lineTo(x + 6, s.height * 0.05)
+        ..lineTo(x + 12, s.height * 0.95)
+        ..lineTo(x + 18, s.height * 0.6);
+    }
+    path.lineTo(s.width, s.height * 0.6);
+    c.drawPath(path, p);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter o) => false;
+}
 
 Color levelColor(double score) => switch (levelOf(score)) {
       FocusLevel.high => kGreen,

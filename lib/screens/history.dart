@@ -1,7 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../analysis/scoring.dart';
 import '../models.dart';
 import '../services/storage.dart';
 import '../widgets/common.dart';
@@ -17,14 +16,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final h = Store.history;
-    String two(int v) => v.toString().padLeft(2, '0');
-    return ListView(padding: const EdgeInsets.all(16), children: [
+    final withScore = h.where((m) => m.hasIndicator).toList();
+    return ListView(padding: const EdgeInsets.fromLTRB(20, 16, 20, 24), children: [
       Row(children: [
         const Expanded(
-            child: Text('Geçmiş Ölçümler', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
+            child: Text('Geçmiş Karnelerim',
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: kNavy))),
         IconButton(
           tooltip: 'CSV olarak kopyala',
-          icon: const Icon(Icons.table_view_outlined),
+          icon: const Icon(Icons.table_view_outlined, color: kNavy),
           onPressed: h.isEmpty
               ? null
               : () {
@@ -34,18 +34,38 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 },
         ),
       ]),
+      const SizedBox(height: 4),
+      const Text('Her karne aynı oturumda yapılan ölçümleri gösterir.',
+          style: TextStyle(color: kMuted, fontSize: 15)),
+      const SizedBox(height: 16),
       if (h.isEmpty)
-        const Padding(
-          padding: EdgeInsets.only(top: 48),
-          child: Center(child: Text('Henüz ölçüm yok.')),
+        GradientCard(
+          colors: gPurple,
+          child: const Column(children: [
+            Text('📋', style: TextStyle(fontSize: 44)),
+            SizedBox(height: 8),
+            Text('Henüz karne yok. İlk ölçümünü yaptığında burada görünecek.',
+                textAlign: TextAlign.center, style: TextStyle(color: kNavy, fontSize: 15)),
+          ]),
         )
       else ...[
-        const SizedBox(height: 8),
-        const Text('Bileşik gösterge eğilimi (eskiden yeniye)'),
-        LineChart(y: h.reversed.map((m) => m.composite).toList(), hLine: 50, height: 100),
-        const SizedBox(height: 8),
+        for (final m in h) ...[
+          KarneCard(
+              m: m,
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute<void>(builder: (_) => ResultScreen(m: m)))),
+          const SizedBox(height: 12),
+        ],
+        if (withScore.length >= 2) ...[
+          const SizedBox(height: 10),
+          const Text('Yorgunluk göstergesi eğilimi (eskiden yeniye)',
+              style: TextStyle(fontWeight: FontWeight.w800, color: kNavy, fontSize: 16)),
+          const SizedBox(height: 6),
+          LineChart(y: withScore.reversed.map((m) => m.composite).toList(), hLine: 50, height: 110),
+        ],
+        const SizedBox(height: 16),
         const Text('Ortam koşullarına göre özet (Ek 3 tablosu için)',
-            style: TextStyle(fontWeight: FontWeight.w600)),
+            style: TextStyle(fontWeight: FontWeight.w800, color: kNavy, fontSize: 16)),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: DataTable(
@@ -73,22 +93,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ],
           ),
         ),
-        const SizedBox(height: 8),
-        for (final m in h)
-          Card(
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: levelColor(m.composite),
-                child: Text('${m.composite.round()}',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-              title: Text(levelTitle(levelOf(m.composite))),
-              subtitle: Text(
-                  '${two(m.time.day)}.${two(m.time.month)}.${m.time.year} ${two(m.time.hour)}:${two(m.time.minute)} · Nabız: ${m.bpm?.round() ?? '-'} · PERCLOS %${m.perclos.toStringAsFixed(1)} · Güven %${m.confidence.round()}'),
-              onTap: () => Navigator.push(context,
-                  MaterialPageRoute<void>(builder: (_) => ResultScreen(m: m))),
-            ),
-          ),
       ],
     ]);
   }
@@ -99,15 +103,17 @@ Map<String, Map<String, double>> conditionSummary(List<Measurement> h) {
   final out = <String, Map<String, double>>{};
   for (final cond in {for (final m in h) m.lightCondition}) {
     final l = h.where((m) => m.lightCondition == cond).toList();
-    double avg(double Function(Measurement) f) =>
-        l.map(f).reduce((a, b) => a + b) / l.length;
+    double avg(double Function(Measurement) f, [bool Function(Measurement)? use]) {
+      final x = use == null ? l : l.where(use).toList();
+      return x.isEmpty ? 0 : x.map(f).reduce((a, b) => a + b) / x.length;
+    }
     out[cond] = {
       'n': l.length.toDouble(),
-      'perclos': avg((m) => m.perclos),
-      'pulseQ': avg((m) => m.pulseQ),
-      'rt': avg((m) => m.reactionMedianMs ?? 0),
+      'perclos': avg((m) => m.perclos, (m) => m.eyeDone),
+      'pulseQ': avg((m) => m.pulseQ, (m) => m.pulseDone),
+      'rt': avg((m) => m.reactionMedianMs ?? 0, (m) => m.reactionMedianMs != null),
       'conf': avg((m) => m.confidence),
-      'valid': 100 * l.where((m) => m.bpm != null).length / l.length,
+      'valid': l.where((m) => m.pulseDone).isEmpty ? 0 : 100 * l.where((m) => m.bpm != null).length / l.where((m) => m.pulseDone).length,
     };
   }
   return out;

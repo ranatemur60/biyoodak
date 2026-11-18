@@ -69,7 +69,7 @@ class _ProfileFormState extends State<ProfileForm> {
   Widget build(BuildContext context) {
     return ListView(padding: const EdgeInsets.all(16), children: [
       if (widget.firstRun) ...[
-        Text('BiyoOdak\'a hoş geldin 👋',
+        Text('NeuroVibe\'a hoş geldin 👋',
             style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 8),
         const Text(

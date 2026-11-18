@@ -1,116 +1,77 @@
-import 'dart:async';
-
 import 'package:material_ui/material_ui.dart';
 
-import '../services/recommendations.dart';
-import '../services/screen_time.dart';
-import '../services/storage.dart';
+import '../main.dart';
 import '../widgets/common.dart';
-import 'result.dart';
+import 'measure.dart';
+import 'screen_usage.dart';
 
-class HomeScreen extends StatefulWidget {
-  final VoidCallback onMeasure;
-  const HomeScreen({super.key, required this.onMeasure});
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
+class HomeScreen extends StatelessWidget {
+  final MainShellState shell;
+  const HomeScreen({super.key, required this.shell});
 
-class _HomeScreenState extends State<HomeScreen> {
-  ScreenStats? stats;
-  Timer? timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-    timer = Timer.periodic(const Duration(seconds: 30), (_) => _load());
-  }
-
-  @override
-  void dispose() {
-    timer?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _load() async {
-    final s = await ScreenTime.stats();
-    if (mounted) setState(() => stats = s);
+  Future<void> _open(BuildContext context, MeasureMode m) async {
+    await Navigator.push(context, MaterialPageRoute<void>(builder: (_) => MeasureScreen(mode: m)));
+    shell.refresh();
   }
 
   @override
   Widget build(BuildContext context) {
-    final h = Store.history;
-    final last = h.isEmpty ? null : h.first;
-    final p = Store.profile;
-    final hour = DateTime.now().hour;
-    final greet = hour < 12 ? 'Günaydın' : (hour < 18 ? 'İyi günler' : 'İyi akşamlar');
-    final tip = generalAdvice[DateTime.now().day % generalAdvice.length];
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView(padding: const EdgeInsets.all(16), children: [
-        Text('$greet${p.name.isEmpty ? '' : ', ${p.name}'} 👋',
-            style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 4),
-        const Text('Bilişsel yorgunluğunu ve odağını 45 saniyede ölç.'),
-        const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(children: [
-              const Text('Bilişsel Yorgunluk ve Odaklanma Göstergesi',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              if (last == null)
-                const Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Text('Henüz ölçüm yok. İlk ölçümünü yap!', textAlign: TextAlign.center),
-                )
-              else
-                InkWell(
-                  onTap: () => Navigator.push(context,
-                      MaterialPageRoute<void>(builder: (_) => ResultScreen(m: last))),
-                  child: FocusGauge(score: last.composite, size: 180),
-                ),
-              const SizedBox(height: 8),
-              const LevelLegend(),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: widget.onMeasure,
-                icon: const Icon(Icons.favorite),
-                label: const Text('Ölçüm Yap'),
-              ),
-            ]),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('📱 Ekran Süresi', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              if (stats == null)
-                const LinearProgressIndicator()
-              else if (stats!.supported) ...[
-                KV('Bugün', '${stats!.todayMin} dk'),
-                KV('Şu anki sürekli kullanım', '${stats!.currentUseMin} dk'),
-                KV('Son gece (22:00–06:00)', '${stats!.nightMin} dk'),
-                if (!stats!.enabled)
-                  const Text('Mola bildirimleri kapalı. Ayarlar\'dan açabilirsin.'),
-              ] else ...[
-                KV('Bugün uygulamada', '${stats!.todayMin} dk'),
-                const Text(
-                    'Web sürümü yalnızca uygulama içindeki süreyi sayar. Telefon geneli takip Android sürümündedir.',
-                    style: TextStyle(fontSize: 12)),
-              ],
-            ]),
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text('Günün önerisi', style: TextStyle(fontWeight: FontWeight.bold)),
-        AdviceTile(tip),
+    return ListView(padding: const EdgeInsets.fromLTRB(20, 16, 20, 16), children: [
+      Row(children: [
+        const Expanded(
+            child: Text('NeuroVibe',
+                style: TextStyle(fontSize: 34, fontWeight: FontWeight.w900, color: kNavy))),
+        IconButton(
+            onPressed: () => shell.go(3),
+            icon: const Icon(Icons.settings_outlined, size: 30, color: kNavy)),
       ]),
-    );
+      const SizedBox(height: 16),
+      GradientCard(
+        colors: gHero,
+        child: Row(children: [
+          const Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Bugün kendine iyi bak! ✨',
+                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800, color: kNavy)),
+              SizedBox(height: 10),
+              Text('Göz, nabız ve dikkat ölçümlerini tek yerde takip et.',
+                  style: TextStyle(fontSize: 15, height: 1.4, color: kNavy)),
+            ]),
+          ),
+          const Text('🧠', style: TextStyle(fontSize: 64)),
+        ]),
+      ),
+      const SizedBox(height: 18),
+      FilledButton.icon(
+        onPressed: () => _open(context, MeasureMode.full),
+        icon: const Icon(Icons.play_circle_fill),
+        label: const Text('Ölçüme Başla'),
+      ),
+      const SizedBox(height: 18),
+      GridView.count(
+        crossAxisCount: 2,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: 14,
+        crossAxisSpacing: 14,
+        childAspectRatio: 0.98,
+        children: [
+          ModuleCard(icon: Icons.favorite, title: 'Nabız Ölçümü', subtitle: 'Yüzden temassız • Deneysel', colors: gPink, onTap: () => _open(context, MeasureMode.pulse)),
+          ModuleCard(icon: Icons.remove_red_eye, title: 'Göz Analizi', subtitle: 'Göz takibi', colors: gBlue, onTap: () => _open(context, MeasureMode.eye)),
+          ModuleCard(icon: Icons.bolt, title: 'Tepki Hızı', subtitle: 'Tepki süresi', colors: gOrange, onTap: () => _open(context, MeasureMode.reaction)),
+          ModuleCard(icon: Icons.auto_graph, title: 'Sonuçlarım', subtitle: 'Karnem', colors: gGreen, onTap: () => shell.go(2)),
+        ],
+      ),
+      const SizedBox(height: 18),
+      OutlinedButton.icon(
+        onPressed: () => Navigator.push(context, MaterialPageRoute<void>(builder: (_) => const ScreenUsageScreen())),
+        icon: const Icon(Icons.smartphone),
+        label: const Text('Ekran Kullanımım'),
+      ),
+      const SizedBox(height: 16),
+      const Center(
+          child: Text('Araştırma prototipi • Tıbbi tanı amacı taşımaz.',
+              style: TextStyle(color: kMuted, fontSize: 13))),
+    ]);
   }
 }

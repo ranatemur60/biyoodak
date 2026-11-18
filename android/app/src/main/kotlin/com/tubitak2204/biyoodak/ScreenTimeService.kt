@@ -68,7 +68,7 @@ class ScreenTimeService : Service() {
         createChannels()
         val n = NotificationCompat.Builder(this, CH_ONGOING)
             .setSmallIcon(android.R.drawable.ic_menu_recent_history)
-            .setContentTitle("BiyoOdak")
+            .setContentTitle("NeuroVibe")
             .setContentText("Ekran süresi takibi açık · Akıllı Mola Bildirimleri")
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_MIN)

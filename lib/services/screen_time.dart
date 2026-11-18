@@ -89,6 +89,7 @@ class WebUsage {
   static final _alertCtrl = StreamController<int>.broadcast();
   static Stream<int> get alerts => _alertCtrl.stream;
   static int _sessionSec = 0;
+  static int get sessionMin => _sessionSec ~/ 60;
 
   static String _today() {
     final d = DateTime.now();

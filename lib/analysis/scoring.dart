@@ -9,25 +9,64 @@ import 'rppg.dart';
 class SessionData {
   final DateTime start;
   final double durationMs;
-  final String lightCondition;
+  String lightCondition;
   // Renk örnekleri (her kamera karesi)
-  final List<double> colorT = [];
-  final List<double> green = [];
-  final List<double> luma = [];
+  List<double> colorT = [];
+  List<double> green = [];
+  List<double> luma = [];
+  List<bool> pulseFace = []; // nabız ölçümü sırasında yüz görünürlüğü
   // Yüz yer işareti örnekleri
-  final List<double> lmT = [];
-  final List<double?> ear = [];
-  final List<bool> face = [];
-  final List<bool> offFocus = [];
-  // Tepki
-  final List<double?> reactionMs = []; // null = kaçırıldı
-  int falseStarts = 0;
+  List<double> lmT = [];
+  List<double?> ear = [];
+  List<bool> face = [];
+  List<bool> offFocus = [];
+  double eyeDurationMs = 0;
+  // Tepki (Go/No-Go)
+  List<double?> reactionMs = []; // null = kaçırıldı
+  int falseStarts = 0; // erken dokunuş + mor kareye dokunma
+  int nogoTotal = 0;
+  int nogoErrors = 0;
   double? notifReactionMs;
+  bool notifShown = false;
+
+  // Hangi modüller bu oturumda tamamlandı
+  bool pulseDone = false;
+  bool eyeDone = false;
+  bool reactionDone = false;
 
   SessionData(
       {required this.start,
       required this.durationMs,
       required this.lightCondition});
+
+  /// Ayrı yapılan bir ölçümün sonuçlarını bu oturum karnesine ekler.
+  void mergeFrom(SessionData o) {
+    if (o.pulseDone) {
+      colorT = o.colorT;
+      green = o.green;
+      luma = o.luma;
+      pulseFace = o.face;
+      pulseDone = true;
+    }
+    if (o.eyeDone || (!eyeDone && o.lmT.isNotEmpty)) {
+      lmT = o.lmT;
+      ear = o.ear;
+      face = o.face;
+      offFocus = o.offFocus;
+      eyeDurationMs = o.durationMs;
+      if (o.eyeDone) eyeDone = true;
+    }
+    if (o.reactionDone) {
+      reactionMs = o.reactionMs;
+      falseStarts = o.falseStarts;
+      nogoTotal = o.nogoTotal;
+      nogoErrors = o.nogoErrors;
+      notifReactionMs = o.notifReactionMs;
+      notifShown = o.notifShown;
+      reactionDone = true;
+    }
+    lightCondition = o.lightCondition;
+  }
 }
 
 /// Kişisel kalibrasyon için önceki ölçümlerden temel değerler.
@@ -86,15 +125,21 @@ Measurement computeMeasurement(SessionData d,
     required int subjectiveFatigue,
     required double nightScreenMin}) {
   // --- Göz (PERCLOS) ---
-  final eye = analyzeEyes(d.lmT, d.ear, durationMs: d.durationMs);
-  final eyeScore = eyeScoreFrom(eye);
+  final eye = d.eyeDone
+      ? analyzeEyes(d.lmT, d.ear,
+          durationMs: d.eyeDurationMs > 0 ? d.eyeDurationMs : d.durationMs)
+      : EyeResult.empty;
+  final eyeScore = d.eyeDone ? eyeScoreFrom(eye) : 0.0;
 
   // --- Nabız (rPPG) ---
-  final r = analyzeRppg(d.colorT, d.green);
+  final r = d.pulseDone ? analyzeRppg(d.colorT, d.green) : RppgResult.empty;
+  final pf = d.pulseFace.isNotEmpty ? d.pulseFace : d.face;
+  final pulseFaceRatio =
+      pf.isEmpty ? 0.0 : pf.where((f) => f).length / pf.length;
   final faceRatio = d.face.isEmpty
       ? 0.0
       : d.face.where((f) => f).length / d.face.length;
-  final pulseQ = r.quality * faceRatio;
+  final pulseQ = r.quality * pulseFaceRatio;
   double? pulseScore;
   var stress = 'Ölçülemedi';
   if (r.bpm != null && pulseQ >= 20) {
@@ -129,7 +174,7 @@ Measurement computeMeasurement(SessionData d,
     }
     if (d.notifReactionMs != null) {
       s -= _lin(d.notifReactionMs!, 900, 0, 2500, 15);
-    } else {
+    } else if (d.notifShown) {
       s -= 10; // bildirim kaçırıldı
     }
     reactionScore = s.clamp(0, 100).toDouble();
@@ -137,6 +182,7 @@ Measurement computeMeasurement(SessionData d,
   final reactionQ = d.reactionMs.isEmpty
       ? 0.0
       : 100.0 * answered.length / d.reactionMs.length;
+  if (!d.reactionDone) reactionScore = 0;
 
   // --- Odak (bakış kayması) ---
   final offPct = d.offFocus.isEmpty
@@ -147,15 +193,27 @@ Measurement computeMeasurement(SessionData d,
 
   // --- Bileşik gösterge (3 ölçüm kaynağı) ---
   // Göz %40, Tepki (reaksiyon %70 + odak %30) %40, Nabız %20
-  final tepki = reactionScore * 0.7 + focusScore * 0.3;
-  double composite;
-  if (pulseScore != null) {
-    composite = eyeScore * 0.4 + tepki * 0.4 + pulseScore * 0.2;
-  } else {
-    composite = eyeScore * 0.5 + tepki * 0.5;
+  // Yalnızca tamamlanan modüller ağırlıklandırılır.
+  final hasFocus = d.offFocus.isNotEmpty;
+  var wSum = 0.0, sum = 0.0;
+  void add(double w, double v) {
+    wSum += w;
+    sum += w * v;
   }
 
-  final confidence = (eye.quality + pulseQ + reactionQ + focusQ) / 4;
+  if (d.eyeDone) add(0.4, eyeScore);
+  if (d.reactionDone) add(0.28, reactionScore);
+  if (hasFocus) add(0.12, focusScore);
+  if (pulseScore != null) add(0.2, pulseScore);
+  final composite = wSum > 0 ? sum / wSum : 0.0;
+
+  final qs = <double>[
+    if (d.eyeDone) eye.quality,
+    if (d.pulseDone) pulseQ,
+    if (d.reactionDone) reactionQ,
+    if (hasFocus) focusQ,
+  ];
+  final confidence = qs.isEmpty ? 0.0 : qs.reduce((a, b) => a + b) / qs.length;
 
   final mel = melatoninRatio(nightScreenMin);
   final exposure = ((1 - mel) * 100).clamp(0, 100).toDouble();
@@ -180,7 +238,7 @@ Measurement computeMeasurement(SessionData d,
     lapses: lapses,
     falseStarts: d.falseStarts,
     notifReactionMs: d.notifReactionMs,
-    offFocusPct: offPct,
+    offFocusPct: hasFocus ? offPct : 0,
     subjectiveFatigue: subjectiveFatigue,
     nightScreenMin: nightScreenMin,
     melatoninRatio: mel,
@@ -189,12 +247,17 @@ Measurement computeMeasurement(SessionData d,
     eyeScore: eyeScore,
     pulseScore: pulseScore,
     reactionScore: reactionScore,
-    focusScore: focusScore,
+    focusScore: hasFocus ? focusScore : 0,
     composite: composite.clamp(0, 100).toDouble(),
+    pulseDone: d.pulseDone,
+    eyeDone: d.eyeDone,
+    reactionDone: d.reactionDone,
+    nogoTotal: d.nogoTotal,
+    nogoErrors: d.nogoErrors,
     eyeQ: eye.quality,
     pulseQ: pulseQ,
     reactionQ: reactionQ,
-    focusQ: focusQ,
+    focusQ: hasFocus ? focusQ : 0,
     confidence: confidence,
     earSeries: eye.earSeries,
     ppgSignal: r.signal,

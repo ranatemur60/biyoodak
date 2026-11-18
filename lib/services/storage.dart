@@ -35,8 +35,14 @@ class Store {
     return out;
   }
 
+  /// Aynı oturumun karnesi güncellenir (aynı başlangıç zamanı), yoksa eklenir.
   static Future<void> addMeasurement(Measurement m) async {
-    final l = _p.getStringList('history') ?? <String>[];
+    final l = List<String>.from(_p.getStringList('history') ?? <String>[]);
+    if (l.isNotEmpty) {
+      try {
+        if (Measurement.decode(l.first).time == m.time) l.removeAt(0);
+      } catch (_) {}
+    }
     // Grafik verileri yalnızca son 5 ölçümde tutulur
     final updated = [m.encode(), ...l];
     for (var i = 5; i < updated.length; i++) {

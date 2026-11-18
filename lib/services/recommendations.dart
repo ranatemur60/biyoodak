@@ -88,27 +88,36 @@ List<Advice> smartAdvice(Measurement m, UserProfile u) {
 
   // Akıllı mola önerisi (nedeniyle birlikte)
   final reasons = <String>[];
-  if (m.notifReactionMs == null || m.notifReactionMs! > 1500) {
+  final focusData = m.eyeDone || m.reactionDone || m.pulseDone;
+  if (m.reactionDone &&
+      (m.notifReactionMs == null || m.notifReactionMs! > 1500)) {
     reasons.add('bildirim tepki süresi yavaş');
   }
-  if (m.perclos > 10) reasons.add('göz kapanma oranı (PERCLOS) yüksek');
-  if ((m.reactionMedianMs ?? 0) > 450) reasons.add('reaksiyon süresi uzamış');
-  if (m.offFocusPct > 20) reasons.add('bakış sık sık ekrandan kaymış');
-  if (level == FocusLevel.severe) {
+  if (m.eyeDone && m.perclos > 8.4) {
+    reasons.add('göz kapanma oranı (PERCLOS) yüksek');
+  }
+  if (m.reactionDone && (m.reactionMedianMs ?? 0) > 500) {
+    reasons.add('tepki süresi uzamış');
+  }
+  if (focusData && m.offFocusPct > 13.3) {
+    reasons.add('bakış sık sık ekrandan kaymış');
+  }
+  if (m.hasIndicator && level == FocusLevel.severe) {
     out.add(Advice('🛑', '20 dakika ekran molası önerilir.',
         reason: reasons.isEmpty ? 'bileşik gösterge düşük' : reasons.join(', '),
         source: Sources.pvt));
-  } else if (level == FocusLevel.mild || reasons.isNotEmpty) {
+  } else if ((m.hasIndicator && level == FocusLevel.mild) ||
+      reasons.isNotEmpty) {
     out.add(Advice('⏸️', '10 dakika ekran molası önerilir.',
         reason: reasons.isEmpty ? 'hafif yorgunluk belirtisi' : reasons.join(', '),
         source: Sources.reaction));
-  } else {
+  } else if (m.hasIndicator) {
     out.add(const Advice('✅',
         'Odağın iyi görünüyor. 25-30 dakikalık çalışma bloklarının ardından kısa mola vermeye devam et.',
         source: Sources.eyeStrain));
   }
 
-  if (m.perclos > 8 || m.blinkRate < 6) {
+  if (m.eyeDone && (m.perclos > 8.4 || m.blinkRate < 6)) {
     out.add(const Advice('👁️',
         '20-20-20 kuralı: 20 dakikada bir, 20 saniye boyunca 6 metre uzağa bak.',
         reason: 'göz yorgunluğu belirtisi', source: Sources.eyeStrain));
