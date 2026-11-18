@@ -9,8 +9,8 @@ class Store {
   static late SharedPreferences _p;
   static Future<void> init() async => _p = await SharedPreferences.getInstance();
 
-  static bool get onboarded => _p.getBool('onboarded') ?? false;
-  static set onboarded(bool v) => _p.setBool('onboarded', v);
+  static bool get onboarded => _p.getBool('onboarded_v2') ?? false;
+  static set onboarded(bool v) => _p.setBool('onboarded_v2', v);
 
   static UserProfile get profile {
     final s = _p.getString('profile');
