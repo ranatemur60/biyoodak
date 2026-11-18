@@ -7,7 +7,7 @@ TÜBİTAK 2204-A Lise Öğrencileri Araştırma Projeleri
 
 ## Uygulamaya erişim
 
-- **Android (tüm özellikler):** [BiyoOdak APK indir](https://github.com/ranatemur60/biyoodak/releases/latest)
+- **Android (tüm özellikler):** [BiyoOdak APK indir](https://github.com/ranatemur60/biyoodak/raw/gh-pages/BiyoOdak.apk)
   Kurulumda telefon "bilinmeyen uygulama" uyarısı verirse Ayarlar'dan izin verip "Yükle"ye basın.
 - **iPhone / bilgisayar (web sürümü):** https://ranatemur60.github.io/biyoodak/
   Safari'de açıp Paylaş > "Ana Ekrana Ekle" ile uygulama gibi kullanılabilir. Web sürümünde telefon geneli ekran süresi bildirimleri yoktur (iOS kısıtı).
