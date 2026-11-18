@@ -48,7 +48,7 @@ const _modes = {
       45,
       gPink,
       kPink,
-      'Yüzünü çerçevenin içinde tut. Ölçüm 45 saniye sürer. Bu sürede konuşma ve başını sabit tut. '
+      'Telefonu yüzünün karşısında tut ve yüzünü çerçevenin içine getir. Ölçüm 45 saniye sürer. Bu sürede konuşma ve başını sabit tut. '
           'Yüzünün önden aydınlık olması ölçümü iyileştirir.'),
   MeasureMode.eye: _ModeInfo(
       'Göz Analizi',
@@ -57,7 +57,7 @@ const _modes = {
       30,
       gBlue,
       kTeal,
-      'Yüzünü çerçevenin içinde tut ve 30 saniye boyunca normal şekilde ekrana bak. '
+      'Telefonu yüzünün karşısında tut ve 30 saniye boyunca normal şekilde ekrana bak. '
           'Göz kırpmalarını bastırmaya çalışma.'),
   MeasureMode.reaction: _ModeInfo(
       'Tepki Hızı',
@@ -94,6 +94,7 @@ class _MeasureScreenState extends State<MeasureScreen> {
   _Phase phase = _Phase.intro;
   String light = kLightConditions[0];
   String? error;
+  String? visionError;
   VisionSource? vision;
   StreamSubscription<FrameSample>? sub;
   SessionData? data;
@@ -151,23 +152,24 @@ class _MeasureScreenState extends State<MeasureScreen> {
     setState(() {
       phase = _Phase.starting;
       error = null;
+      visionError = null;
     });
     try {
       final v = VisionSource.create();
       vision = v;
       await v.start();
-      sub = v.samples.listen(_onSample);
-      setState(() => phase = _Phase.waitingFace);
-      final deadline = DateTime.now().add(const Duration(seconds: 15));
-      while (mounted && phase == _Phase.waitingFace) {
-        if (faceNow) {
-          _countdown();
-          return;
+      sub = v.samples.listen(_onSample, onError: (Object e) {
+        if (mounted) {
+          setState(() => visionError = e.toString().replaceFirst('Exception: ', ''));
         }
-        if (DateTime.now().isAfter(deadline)) {
-          await _cancel();
-          setState(() => error =
-              'Yüz algılanamadı. Yüzünü çerçevenin ortasına getir ve önden ışık aldığından emin ol.');
+      });
+      setState(() => phase = _Phase.waitingFace);
+      // Yüz en fazla 6 sn beklenir; bulunamazsa ölçüm yine başlar ve
+      // ekranda uyarı gösterilir.
+      final deadline = DateTime.now().add(const Duration(seconds: 6));
+      while (mounted && phase == _Phase.waitingFace) {
+        if (faceNow || DateTime.now().isAfter(deadline)) {
+          _countdown();
           return;
         }
         await Future<void>.delayed(const Duration(milliseconds: 200));
@@ -327,6 +329,12 @@ class _MeasureScreenState extends State<MeasureScreen> {
         ? stats.nightMin.toDouble()
         : profile.nightVideoMinutes.toDouble();
     final d = data!;
+    // Ortam ışığı yüz parlaklığından otomatik belirlenir.
+    if (d.luma.isNotEmpty) {
+      final avg = d.luma.reduce((a, b) => a + b) / d.luma.length;
+      d.lightCondition = avg < 70 ? 'Karanlık ortam' : 'Önden yeterli ışık';
+    }
+    light = d.lightCondition;
     SessionData acc;
     if (widget.mode == MeasureMode.full) {
       CurrentSession.replaceWith(d);
@@ -384,17 +392,7 @@ class _MeasureScreenState extends State<MeasureScreen> {
             Expanded(child: _legendBox(false)),
           ]),
         ],
-        const SizedBox(height: 20),
-        const Text('Ortam ışığı', style: TextStyle(fontWeight: FontWeight.w800, color: kNavy, fontSize: 16)),
-        const SizedBox(height: 8),
-        Wrap(spacing: 8, runSpacing: 8, children: [
-          for (final l in kLightConditions)
-            ChoiceChip(
-                label: Text(l),
-                selected: light == l,
-                selectedColor: const Color(0xFFEAE4FF),
-                onSelected: (_) => setState(() => light = l)),
-        ]),
+        const SizedBox(height: 4),
         if (error != null) ...[
           const SizedBox(height: 16),
           Container(
@@ -441,9 +439,9 @@ class _MeasureScreenState extends State<MeasureScreen> {
     final remaining = ((durationMs - t) / 1000).ceil().clamp(0, info.seconds.round());
     final status = switch (phase) {
       _Phase.starting => 'Kamera hazırlanıyor...',
-      _Phase.waitingFace => 'Yüzünü çerçevenin içine getir',
+      _Phase.waitingFace => 'Telefonu yüzüne doğru tut, yüzünü çerçeveye getir',
       _Phase.countdown => 'Başlıyor: $countdown',
-      _ => faceNow ? 'Ölçülüyor... $remaining sn' : 'Yüz görünmüyor',
+      _ => faceNow ? 'Ölçülüyor... $remaining sn' : 'Yüz görünmüyor · $remaining sn',
     };
     return Listener(
       behavior: HitTestBehavior.opaque,
@@ -511,6 +509,11 @@ class _MeasureScreenState extends State<MeasureScreen> {
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                         color: phase == _Phase.recording && !faceNow ? kRed : kNavy)),
+                if (visionError != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(visionError!, style: const TextStyle(fontSize: 12.5, color: kRed)),
+                  ),
                 if (hasStimuli)
                   const Padding(
                     padding: EdgeInsets.only(top: 4),

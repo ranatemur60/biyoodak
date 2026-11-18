@@ -20,13 +20,20 @@ class AndroidVisionSource implements VisionSource {
       enableContours: true,
       enableClassification: true,
       performanceMode: FaceDetectorMode.fast,
-      minFaceSize: 0.2,
+      minFaceSize: 0.15,
     ),
   );
   bool _busy = false;
   // Alın ROI (ham görüntü koordinatlarında)
   Rect? _roiRaw;
   int _rotation = 270;
+  // Bazı cihazlarda sensör yönü yanlış bildirilebilir: yüz bulunamazsa
+  // diğer yönler de denenir, yüz bulunan yön sabitlenir.
+  List<int> _rotCandidates = const [270];
+  int _rotIdx = 0;
+  bool _rotLocked = false;
+  int _noFace = 0;
+  int _errors = 0;
   final _sw = Stopwatch();
 
   @override
@@ -40,6 +47,11 @@ class AndroidVisionSource implements VisionSource {
         (c) => c.lensDirection == CameraLensDirection.front,
         orElse: () => cams.first);
     _rotation = front.sensorOrientation;
+    _rotCandidates = {_rotation, 270, 90, 0, 180}.toList();
+    _rotIdx = 0;
+    _rotLocked = false;
+    _noFace = 0;
+    _errors = 0;
     final c = CameraController(front, ResolutionPreset.medium,
         enableAudio: false, imageFormatGroup: ImageFormatGroup.nv21);
     try {
@@ -107,13 +119,20 @@ class AndroidVisionSource implements VisionSource {
         ),
       );
       final faces = await _detector.processImage(input);
+      _errors = 0;
       if (faces.isEmpty) {
         _roiRaw = null;
+        if (!_rotLocked && ++_noFace >= 6) {
+          _noFace = 0;
+          _rotIdx = (_rotIdx + 1) % _rotCandidates.length;
+          _rotation = _rotCandidates[_rotIdx];
+        }
         _ctrl.add(FrameSample.landmark(t, face: false));
       } else {
         faces.sort((a, b) => (b.boundingBox.width * b.boundingBox.height)
             .compareTo(a.boundingBox.width * a.boundingBox.height));
         final f = faces.first;
+        _rotLocked = true;
         _roiRaw = _uprightToRaw(_foreheadRect(f), w, h);
         _ctrl.add(FrameSample.landmark(
           t,
@@ -124,8 +143,12 @@ class AndroidVisionSource implements VisionSource {
           pitch: f.headEulerAngleX,
         ));
       }
-    } catch (_) {
-      // Tek karelik hatalar yok sayılır
+    } catch (e) {
+      // Tek karelik hatalar yok sayılır; sürekli hata olursa bildirilir.
+      _ctrl.add(FrameSample.landmark(t, face: false));
+      if (++_errors == 15) {
+        _ctrl.addError(Exception('Yüz analizi çalışmadı ($w×$h): $e'));
+      }
     } finally {
       _busy = false;
     }
