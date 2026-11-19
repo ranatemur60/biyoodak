@@ -25,7 +25,12 @@ class MainActivity : FlutterActivity() {
                         val th = (call.argument<List<Int>>("thresholds") ?: listOf(30, 45, 60))
                         val reset = call.argument<Int>("resetMin") ?: 30
                         val name = call.argument<String>("name") ?: ""
-                        ScreenState.prefs(this).edit()
+                        val sp = ScreenState.prefs(this)
+                        val wasOn = sp.getBoolean("enabled", false)
+                        val ed = sp.edit()
+                        // Takip yeni açılıyorsa sayaç sıfırdan başlar.
+                        if (!wasOn) ed.putLong("useMs", 0L).putInt("alertsSent", 0)
+                        ed
                             .putBoolean("enabled", true)
                             .putString("thresholds", th.joinToString(","))
                             .putInt("resetMin", reset)

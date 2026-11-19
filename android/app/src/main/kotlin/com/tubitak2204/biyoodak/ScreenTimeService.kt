@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.KeyguardManager
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -32,6 +33,7 @@ class ScreenTimeService : Service() {
         private const val CH_ALERT = "biyo_mola"
         private const val ID_ONGOING = 1001
         private const val TICK_MS = 20_000L
+        private const val MAX_GAP_MS = 90_000L
 
         /** Kullanıcının deneyebilmesi için hemen bir örnek mola bildirimi gönderir. */
         fun sendTest(c: Context) {
@@ -128,8 +130,7 @@ class ScreenTimeService : Service() {
         if (stale > 0L) {
             prefs().edit().putLong("countFrom", 0L).putLong("lastOff", stale).apply()
         }
-        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-        if (pm.isInteractive) onScreenOn() else onScreenOff()
+        if (isInUse()) onScreenOn() else onScreenOff()
         handler.post(ticker)
     }
 
@@ -151,7 +152,17 @@ class ScreenTimeService : Service() {
 
     private fun prefs() = ScreenState.prefs(this)
 
+    /** Telefon şu an kullanılıyor mu: ekran açık VE kilit ekranı geçilmiş. */
+    private fun isInUse(): Boolean {
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+        return pm.isInteractive && !km.isKeyguardLocked
+    }
+
     private fun onScreenOn() {
+        // Kilit ekranında beklerken (bildirime bakmak vb.) sayılmaz;
+        // kilit açılınca (USER_PRESENT) sayım başlar.
+        if (!isInUse()) return
         val p = prefs()
         if (p.getLong("countFrom", 0L) > 0L) return // zaten sayıyor
         val now = System.currentTimeMillis()
@@ -167,23 +178,53 @@ class ScreenTimeService : Service() {
     }
 
     private fun onScreenOff() {
-        flush()
-        prefs().edit().putLong("countFrom", 0L).putLong("lastOff", System.currentTimeMillis()).apply()
-    }
-
-    /** Sayılan süreyi kalıcı sayaçlara ekler. */
-    private fun flush() {
         val p = prefs()
         val from = p.getLong("countFrom", 0L)
-        if (from <= 0L) return
+        val stop = flush()
+        if (from > 0L || p.getLong("lastOff", 0L) == 0L) {
+            p.edit().putLong("countFrom", 0L).putLong("lastOff", stop).apply()
+        }
+    }
+
+    /**
+     * Sayılan süreyi kalıcı sayaçlara ekler ve sayımın bittiği anı döndürür.
+     * İki sayım arasında 90 sn'den uzun boşluk varsa telefon uykudaydı ya da
+     * uygulama durdurulmuştu: o süre kullanım sayılmaz.
+     */
+    private fun flush(): Long {
+        val p = prefs()
+        val from = p.getLong("countFrom", 0L)
         val now = System.currentTimeMillis()
+        if (from <= 0L) return now
+        if (now - from > MAX_GAP_MS || now < from) {
+            p.edit().putLong("countFrom", now).apply()
+            return from
+        }
         ScreenState.addUsage(this, from, now)
         p.edit().putLong("useMs", p.getLong("useMs", 0L) + (now - from)).putLong("countFrom", now).apply()
+        return now
     }
 
     private fun tick() {
         val p = prefs()
-        if (p.getLong("countFrom", 0L) <= 0L) return
+        val counting = p.getLong("countFrom", 0L) > 0L
+        val inUse = isInUse()
+        // Ekran olayı kaçırıldıysa gerçek duruma göre düzelt.
+        if (counting && !inUse) {
+            onScreenOff()
+            return
+        }
+        if (!counting) {
+            if (inUse) onScreenOn()
+            return
+        }
+        val gapStart = p.getLong("countFrom", 0L)
+        if (System.currentTimeMillis() - gapStart > MAX_GAP_MS) {
+            // Uzun boşluk: telefon kullanılmıyordu. Mola sayılıp yeniden başlar.
+            p.edit().putLong("countFrom", 0L).putLong("lastOff", gapStart).apply()
+            onScreenOn()
+            return
+        }
         flush()
         val use = p.getLong("useMs", 0L)
         val th = (p.getString("thresholds", "30,45,60") ?: "30,45,60").split(",").mapNotNull { it.trim().toIntOrNull() }

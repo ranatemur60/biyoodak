@@ -81,7 +81,7 @@ class _BreakAlertsCardState extends State<BreakAlertsCard> with WidgetsBindingOb
         const SizedBox(height: 6),
         Text(
             ScreenTime.supported
-                ? 'Telefonu aralıksız kullandığında 30, 45 ve 60. dakikada bildirim gelir. Ekran 30 dakika kapalı kalırsa (mola) sayaç sıfırlanır.'
+                ? 'Telefonu kilidi açık şekilde kullandığın süre 30, 45 ve 60 dakikaya ulaşınca bildirim gelir. Ekran kapalı ve kilitliyken sayılmaz. Ekran 30 dakika kapalı kalırsa (mola) sayaç sıfırlanır.'
                 : 'Web sürümünde yalnızca uygulama açıkken geçen süre sayılır; 30, 45 ve 60. dakikada uygulama içinde uyarı gösterilir.',
             style: const TextStyle(color: kNavy, height: 1.4)),
         if (ScreenTime.supported && Store.breakAlerts && st != null) ...[
@@ -153,7 +153,7 @@ class _ScreenUsageScreenState extends State<ScreenUsageScreen> {
             decoration: BoxDecoration(color: const Color(0xFFE2F6FF), borderRadius: BorderRadius.circular(20)),
             child: Text(
                 android
-                    ? 'Bu bölüm Android ekran açık kalma süresini ölçer. Gözlerin ekrana baktığı süreyi ölçmez.'
+                    ? 'Bu bölüm telefonun kilidi açık ve ekranı açıkken geçen süreyi ölçer. Ekran kapalıyken veya kilit ekranındayken sayılmaz.'
                     : 'Tarayıcı telefonun genel ekran süresini okuyamaz. Burada yalnızca NeuroVibe açıkken geçen süre gösterilir. Telefon geneli takip Android sürümünde çalışır.',
                 style: const TextStyle(color: kNavy, height: 1.4)),
           ),

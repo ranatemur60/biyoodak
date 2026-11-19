@@ -34,19 +34,21 @@ object ScreenState {
     fun addUsage(c: Context, fromMs: Long, toMs: Long) {
         if (toMs <= fromMs) return
         val p = prefs(c)
-        val e = p.edit()
+        val add = HashMap<String, Long>()
         var t = fromMs
         // Dakika dakika dağıt (gün ve gece sınırlarını doğru böler)
         while (t < toMs) {
             val step = minOf(60_000L, toMs - t)
             val d = "day_" + dayKey(t)
-            e.putLong(d, p.getLong(d, 0L) + step)
+            add[d] = (add[d] ?: 0L) + step
             nightKey(t)?.let { n ->
                 val k = "night_$n"
-                e.putLong(k, p.getLong(k, 0L) + step)
+                add[k] = (add[k] ?: 0L) + step
             }
             t += step
         }
+        val e = p.edit()
+        for ((k, v) in add) e.putLong(k, p.getLong(k, 0L) + v)
         e.apply()
     }
 
@@ -66,7 +68,7 @@ object ScreenState {
         var today = p.getLong("day_" + dayKey(now), 0L)
         var night = p.getLong("night_" + lastNightKey(now), 0L)
         var use = p.getLong("useMs", 0L)
-        if (pendingFrom in 1 until now) {
+        if (pendingFrom in 1 until now && now - pendingFrom <= 90_000L) {
             val extra = now - pendingFrom
             today += extra
             if (nightKey(now) != null) night += extra
