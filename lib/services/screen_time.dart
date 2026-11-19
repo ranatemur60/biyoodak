@@ -49,7 +49,7 @@ class ScreenTime {
     try {
       await _ch.invokeMethod('start', {
         'thresholds': [30, 45, 60],
-        'resetMin': 30,
+        'resetMin': 0, // ekran kilitlenince sayaç sıfırlanır
         'name': name,
       });
     } catch (_) {}

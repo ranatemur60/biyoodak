@@ -23,7 +23,7 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "start" -> {
                         val th = (call.argument<List<Int>>("thresholds") ?: listOf(30, 45, 60))
-                        val reset = call.argument<Int>("resetMin") ?: 30
+                        val reset = call.argument<Int>("resetMin") ?: 0
                         val name = call.argument<String>("name") ?: ""
                         val sp = ScreenState.prefs(this)
                         val wasOn = sp.getBoolean("enabled", false)

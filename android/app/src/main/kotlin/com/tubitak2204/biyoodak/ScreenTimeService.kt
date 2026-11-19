@@ -23,8 +23,8 @@ import java.util.Calendar
 
 /**
  * Akıllı Mola Bildirimleri: Ekranın açık kaldığı sürekli kullanım süresini
- * arka planda izler. 30, 45 ve 60. dakikalarda uyarı verir; ekran en az
- * 30 dakika kapalı kalırsa (mola) sayaç sıfırlanır.
+ * arka planda izler. 30, 45 ve 60. dakikalarda uyarı verir; ekran
+ * kilitlenince sayaç sıfırlanır; yalnızca art arda kullanım sayılır.
  */
 class ScreenTimeService : Service() {
     companion object {
@@ -167,11 +167,11 @@ class ScreenTimeService : Service() {
         if (p.getLong("countFrom", 0L) > 0L) return // zaten sayıyor
         val now = System.currentTimeMillis()
         val off = p.getLong("lastOff", 0L)
-        val resetMs = p.getInt("resetMin", 30) * 60_000L
+        val resetMs = p.getInt("resetMin", 0) * 60_000L
         val e = p.edit()
         val today = ScreenState.dayKey(now)
         if ((off > 0 && now - off >= resetMs) || p.getString("useDay", "") != today) {
-            // 30 dakikalık mola tamamlandı ya da yeni gün başladı: sıfırla
+            // Ekran kilitlendi (kullanım bitti) ya da yeni gün başladı: sıfırla
             e.putLong("useMs", 0L).putInt("alertsSent", 0).putString("useDay", today)
         }
         e.putLong("countFrom", now).apply()
@@ -246,7 +246,7 @@ class ScreenTimeService : Service() {
         val (title, body) = when (level) {
             0 -> "$minutes dakikadır ekrandasın 👀" to "${hi}gözlerini 20 saniye boyunca 6 metre uzağa odakla (20-20-20 kuralı)."
             1 -> "$minutes dakika oldu ⏳" to "${hi}kalk, bir bardak su iç ve biraz esne. Kısa bir mola odağını tazeler."
-            else -> "$minutes dakika doldu! 🛑" to "${hi}artık telefonu bırakma zamanı. Hadi 30 dakikalık bir mola verelim; sayaç sonra sıfırlanır."
+            else -> "$minutes dakika doldu! 🛑" to "${hi}artık telefonu bırakma zamanı. Hadi telefonu kilitleyip bir mola verelim."
         }
         val text = if (isNight()) "$body Gece ekran ışığı melatonini baskılayıp uykuya geçişi zorlaştırabilir." else body
         val now = System.currentTimeMillis()

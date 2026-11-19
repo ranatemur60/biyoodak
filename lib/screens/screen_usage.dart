@@ -81,7 +81,7 @@ class _BreakAlertsCardState extends State<BreakAlertsCard> with WidgetsBindingOb
         const SizedBox(height: 6),
         Text(
             ScreenTime.supported
-                ? 'Telefonu kilidi açık şekilde kullandığın süre 30, 45 ve 60 dakikaya ulaşınca bildirim gelir. Ekran kapalı ve kilitliyken sayılmaz. Ekran 30 dakika kapalı kalırsa (mola) sayaç sıfırlanır.'
+                ? 'Telefonu kilidi açık şekilde kullandığın süre 30, 45 ve 60 dakikaya ulaşınca bildirim gelir. Her kullanım ayrı sayılır: ekranı kilitlediğinde sayaç sıfırlanır.'
                 : 'Web sürümünde yalnızca uygulama açıkken geçen süre sayılır; 30, 45 ve 60. dakikada uygulama içinde uyarı gösterilir.',
             style: const TextStyle(color: kNavy, height: 1.4)),
         if (ScreenTime.supported && Store.breakAlerts && st != null) ...[
