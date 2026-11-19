@@ -53,7 +53,7 @@ class TechnicalReportScreen extends StatelessWidget {
         Text('C(t) = (1/|ROI|) · Σ I_G(x, y, t)\nBPM = 60 × f_baskın\nSNR = 10·log10(P_sinyal / P_gürültü)', style: mono),
         const SizedBox(height: 4),
         Text(
-            'Not: 45 saniyelik kamera ölçümünden HRV güvenilir şekilde elde edilemeyebilir; sinyal kalitesi yetersizse "ölçülemedi" gösterilir.',
+            'Not: HRV, nabız sinyalindeki atımlar arası sürelerden hesaplanır (en az 25 sn kayıt, SNR > -3 dB, en az 15 geçerli atım). Işık zayıfsa veya baş hareket ederse "ölçülemedi" gösterilir.',
             style: Theme.of(context).textTheme.bodySmall),
         _src(context, Sources.rppg),
         _src(context, Sources.snr),

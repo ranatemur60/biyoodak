@@ -88,24 +88,42 @@ RppgResult analyzeRppg(List<double> tMs, List<double> green,
   final quality = 100 * snrQ * fpsQ;
   final bpm = snr > -9 ? f0 * 60 : null;
 
-  // HRV (RMSSD): yalnızca sinyal çok temizse
+  // HRV (RMSSD): nabız frekansı çevresinde dar bantlı sinyalde tepe noktaları
+  // bulunur, tepe zamanları parabolik interpolasyonla 33 ms'lik kare
+  // aralığından daha hassas hesaplanır. Hatalı atımlar ayıklanır.
   double? rmssd;
-  if (bpm != null && snr > 0 && durS >= 30) {
-    final minDist = (fs * 60 / (bpm * 1.4)).floor();
-    final peaks = findPeaks(y, math.max(minDist, 5));
-    final expected = 60000 / bpm;
-    final ibis = <double>[];
-    for (var i = 1; i < peaks.length; i++) {
-      final ibi = (peaks[i] - peaks[i - 1]) * 1000 / fs;
-      if ((ibi - expected).abs() < expected * 0.25) ibis.add(ibi);
-    }
-    if (ibis.length >= 20) {
-      var s = 0.0;
-      for (var i = 1; i < ibis.length; i++) {
-        s += math.pow(ibis[i] - ibis[i - 1], 2);
+  if (bpm != null && snr > -3 && durS >= 25) {
+    final lo = math.max(lowHz, f0 - 0.6), hi = math.min(highHz, f0 + 0.9);
+    var z = bandPass(x, lo, hi, fs);
+    z = z.sublist(skip, z.length - skip);
+    final minDist = (fs * 60 / (bpm * 1.35)).floor();
+    final peaks = findPeaks(z, math.max(minDist, 5));
+    final tPeak = <double>[];
+    for (final k in peaks) {
+      var off = 0.0;
+      if (k > 0 && k < z.length - 1) {
+        final a = z[k - 1], b = z[k], c = z[k + 1];
+        final den = a - 2 * b + c;
+        if (den.abs() > 1e-12) off = (0.5 * (a - c) / den).clamp(-0.5, 0.5);
       }
-      rmssd = math.sqrt(s / (ibis.length - 1));
+      tPeak.add((k + off) * 1000 / fs);
     }
+    final expected = 60000 / bpm;
+    final ibis = <double?>[];
+    for (var i = 1; i < tPeak.length; i++) {
+      final ibi = tPeak[i] - tPeak[i - 1];
+      ibis.add((ibi - expected).abs() < expected * 0.3 ? ibi : null);
+    }
+    var s = 0.0, n = 0, valid = 0;
+    for (var i = 0; i < ibis.length; i++) {
+      if (ibis[i] != null) valid++;
+      if (i == 0 || ibis[i] == null || ibis[i - 1] == null) continue;
+      final d = ibis[i]! - ibis[i - 1]!;
+      if (d.abs() > 250) continue; // artefakt
+      s += d * d;
+      n++;
+    }
+    if (valid >= 15 && n >= 10) rmssd = math.sqrt(s / n);
   }
 
   return RppgResult(

@@ -25,6 +25,38 @@ void main() {
     expect(r.snrDb, greaterThan(0));
   });
 
+  test('rPPG değişken atım aralıklarından HRV (RMSSD) hesaplar', () {
+    final rnd = math.Random(5);
+    // Gerçek atım zamanları: ortalama 833 ms, rastgele değişim
+    final beats = <double>[0];
+    while (beats.last < 47000) {
+      final u = rnd.nextDouble() + rnd.nextDouble() + rnd.nextDouble() - 1.5;
+      beats.add(beats.last + 833 + u * 50);
+    }
+    var ss = 0.0;
+    for (var i = 2; i < beats.length; i++) {
+      final d = (beats[i] - beats[i - 1]) - (beats[i - 1] - beats[i - 2]);
+      ss += d * d;
+    }
+    final trueRmssd = math.sqrt(ss / (beats.length - 2));
+    final t = <double>[];
+    final g = <double>[];
+    var time = 0.0, k = 0;
+    while (time < 45000) {
+      while (beats[k + 1] <= time) {
+        k++;
+      }
+      final ph = (time - beats[k]) / (beats[k + 1] - beats[k]);
+      t.add(time);
+      g.add(120 + 0.6 * math.cos(2 * math.pi * ph) + rnd.nextDouble() * 0.6 - 0.3);
+      time += 30 + rnd.nextDouble() * 6;
+    }
+    final r = analyzeRppg(t, g);
+    expect(r.rmssd, isNotNull);
+    expect((r.rmssd! - trueRmssd).abs(), lessThan(15),
+        reason: 'gerçek ${trueRmssd.toStringAsFixed(1)} ölçülen ${r.rmssd!.toStringAsFixed(1)}');
+  });
+
   test('rPPG saf gürültüde düşük kalite verir', () {
     final rnd = math.Random(2);
     final t = List<double>.generate(1300, (i) => i * 33.3);
