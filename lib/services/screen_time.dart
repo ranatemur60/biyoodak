@@ -14,7 +14,11 @@ class ScreenStats {
   final int nightMin;
   final int alertsSent;
   final List<int> notifLatenciesMs;
+  final bool notifAllowed;
+  final bool batteryOk;
   const ScreenStats({
+    this.notifAllowed = true,
+    this.batteryOk = true,
     this.supported = false,
     this.enabled = false,
     this.todayMin = 0,
@@ -51,6 +55,17 @@ class ScreenTime {
     } catch (_) {}
   }
 
+  static Future<void> _call(String m) async {
+    if (!supported) return;
+    try {
+      await _ch.invokeMethod(m);
+    } catch (_) {}
+  }
+
+  static Future<void> sendTest() => _call('test');
+  static Future<void> openNotifSettings() => _call('openNotifSettings');
+  static Future<void> requestBattery() => _call('requestBattery');
+
   static Future<void> stop() async {
     if (!supported) return;
     try {
@@ -72,6 +87,8 @@ class ScreenTime {
         currentUseMin: (m['currentUseMin'] ?? 0) as int,
         nightMin: (m['nightMin'] ?? 0) as int,
         alertsSent: (m['alertsSent'] ?? 0) as int,
+        notifAllowed: m['notifAllowed'] != false,
+        batteryOk: m['batteryOk'] != false,
         notifLatenciesMs: ((m['latencies'] ?? const []) as List)
             .map((e) => (e as num).toInt())
             .toList(),

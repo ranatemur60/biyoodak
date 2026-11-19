@@ -12,7 +12,43 @@ class BreakAlertsCard extends StatefulWidget {
   State<BreakAlertsCard> createState() => _BreakAlertsCardState();
 }
 
-class _BreakAlertsCardState extends State<BreakAlertsCard> {
+class _BreakAlertsCardState extends State<BreakAlertsCard> with WidgetsBindingObserver {
+  ScreenStats? st;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState s) {
+    if (s == AppLifecycleState.resumed) _load();
+  }
+
+  Future<void> _load() async {
+    if (!ScreenTime.supported) return;
+    final v = await ScreenTime.stats();
+    if (mounted) setState(() => st = v);
+  }
+
+  Widget _warn(String text, String button, VoidCallback onTap) => Container(
+        margin: const EdgeInsets.only(top: 10, right: 8),
+        padding: const EdgeInsets.fromLTRB(12, 10, 6, 6),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(text, style: const TextStyle(color: kRed, fontWeight: FontWeight.w600)),
+          Align(alignment: Alignment.centerRight, child: TextButton(onPressed: onTap, child: Text(button))),
+        ]),
+      );
+
   @override
   Widget build(BuildContext context) {
     return GradientCard(
@@ -37,6 +73,7 @@ class _BreakAlertsCardState extends State<BreakAlertsCard> {
               }
               if (mounted) setState(() {});
               await Future<void>.delayed(const Duration(milliseconds: 300));
+              await _load();
               widget.onChanged?.call();
             },
           ),
@@ -47,6 +84,23 @@ class _BreakAlertsCardState extends State<BreakAlertsCard> {
                 ? 'Telefonu aralıksız kullandığında 30, 45 ve 60. dakikada bildirim gelir. Ekran 30 dakika kapalı kalırsa (mola) sayaç sıfırlanır.'
                 : 'Web sürümünde yalnızca uygulama açıkken geçen süre sayılır; 30, 45 ve 60. dakikada uygulama içinde uyarı gösterilir.',
             style: const TextStyle(color: kNavy, height: 1.4)),
+        if (ScreenTime.supported && Store.breakAlerts && st != null) ...[
+          if (!st!.notifAllowed)
+            _warn('Bildirim izni kapalı, bu yüzden uyarılar gelmez.', 'Bildirim iznini aç',
+                () => ScreenTime.openNotifSettings()),
+          if (st!.notifAllowed && !st!.batteryOk)
+            _warn('Pil tasarrufu uygulamayı arka planda durdurabilir.', 'Arka planda çalışmasına izin ver',
+                () => ScreenTime.requestBattery()),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () async {
+              await ScreenTime.sendTest();
+              await _load();
+            },
+            icon: const Icon(Icons.notifications_active_outlined),
+            label: const Text('Deneme bildirimi gönder'),
+          ),
+        ],
       ]),
     );
   }

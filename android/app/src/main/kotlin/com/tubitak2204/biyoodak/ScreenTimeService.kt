@@ -33,6 +33,43 @@ class ScreenTimeService : Service() {
         private const val ID_ONGOING = 1001
         private const val TICK_MS = 20_000L
 
+        /** Kullanıcının deneyebilmesi için hemen bir örnek mola bildirimi gönderir. */
+        fun sendTest(c: Context) {
+            createChannels(c)
+            val name = ScreenState.prefs(c).getString("name", "") ?: ""
+            val hi = if (name.isNotBlank()) "$name, " else ""
+            val n = NotificationCompat.Builder(c, CH_ALERT)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle("Mola bildirimi deneme 🔔")
+                .setContentText("${hi}bildirimler çalışıyor. 30, 45 ve 60. dakikada böyle uyarılar gelecek.")
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setAutoCancel(true)
+                .setContentIntent(
+                    PendingIntent.getActivity(
+                        c, 99, Intent(c, MainActivity::class.java),
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                    )
+                )
+                .build()
+            try {
+                (c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).notify(2999, n)
+            } catch (_: SecurityException) {
+            }
+        }
+
+        fun createChannels(c: Context) {
+            if (Build.VERSION.SDK_INT < 26) return
+            val nm = c.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.createNotificationChannel(
+                NotificationChannel(CH_ONGOING, "Ekran süresi takibi", NotificationManager.IMPORTANCE_MIN)
+            )
+            nm.createNotificationChannel(
+                NotificationChannel(CH_ALERT, "Akıllı Mola Bildirimleri", NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = "30, 45 ve 60 dakikalık ekran kullanımında uyarılar"
+                }
+            )
+        }
+
         fun start(c: Context) {
             val i = Intent(c, ScreenTimeService::class.java)
             try {
@@ -85,6 +122,12 @@ class ScreenTimeService : Service() {
             ContextCompat.registerReceiver(this, receiver, f, ContextCompat.RECEIVER_NOT_EXPORTED)
             registered = true
         }
+        // Servis sistem tarafından kapatılıp yeniden başlatıldıysa eski sayaç
+        // açık kalmış olabilir: o anı ekranın kapandığı an kabul et.
+        val stale = prefs().getLong("countFrom", 0L)
+        if (stale > 0L) {
+            prefs().edit().putLong("countFrom", 0L).putLong("lastOff", stale).apply()
+        }
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
         if (pm.isInteractive) onScreenOn() else onScreenOff()
         handler.post(ticker)
@@ -115,9 +158,10 @@ class ScreenTimeService : Service() {
         val off = p.getLong("lastOff", 0L)
         val resetMs = p.getInt("resetMin", 30) * 60_000L
         val e = p.edit()
-        if (off > 0 && now - off >= resetMs) {
-            // 30 dakikalık mola tamamlandı: sıfırla
-            e.putLong("useMs", 0L).putInt("alertsSent", 0)
+        val today = ScreenState.dayKey(now)
+        if ((off > 0 && now - off >= resetMs) || p.getString("useDay", "") != today) {
+            // 30 dakikalık mola tamamlandı ya da yeni gün başladı: sıfırla
+            e.putLong("useMs", 0L).putInt("alertsSent", 0).putString("useDay", today)
         }
         e.putLong("countFrom", now).apply()
     }
@@ -192,16 +236,5 @@ class ScreenTimeService : Service() {
         )
     }
 
-    private fun createChannels() {
-        if (Build.VERSION.SDK_INT < 26) return
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.createNotificationChannel(
-            NotificationChannel(CH_ONGOING, "Ekran süresi takibi", NotificationManager.IMPORTANCE_MIN)
-        )
-        nm.createNotificationChannel(
-            NotificationChannel(CH_ALERT, "Akıllı Mola Bildirimleri", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "30, 45 ve 60 dakikalık ekran kullanımında uyarılar"
-            }
-        )
-    }
+    private fun createChannels() = createChannels(this)
 }

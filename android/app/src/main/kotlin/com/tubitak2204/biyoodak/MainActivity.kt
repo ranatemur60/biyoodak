@@ -4,8 +4,12 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.net.Uri
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -35,7 +39,45 @@ class MainActivity : FlutterActivity() {
                         stopService(Intent(this, ScreenTimeService::class.java))
                         result.success(true)
                     }
-                    "stats" -> result.success(ScreenState.stats(this))
+                    "stats" -> {
+                        val m = ScreenState.stats(this).toMutableMap()
+                        m["notifAllowed"] = NotificationManagerCompat.from(this).areNotificationsEnabled()
+                        val pm = getSystemService(POWER_SERVICE) as PowerManager
+                        m["batteryOk"] = Build.VERSION.SDK_INT < 23 || pm.isIgnoringBatteryOptimizations(packageName)
+                        result.success(m)
+                    }
+                    "test" -> {
+                        ScreenTimeService.sendTest(this)
+                        result.success(true)
+                    }
+                    "openNotifSettings" -> {
+                        try {
+                            val i = if (Build.VERSION.SDK_INT >= 26) {
+                                Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    .putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                            } else {
+                                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+                            }
+                            startActivity(i)
+                        } catch (_: Exception) {
+                        }
+                        result.success(true)
+                    }
+                    "requestBattery" -> {
+                        try {
+                            if (Build.VERSION.SDK_INT >= 23) {
+                                startActivity(
+                                    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))
+                                )
+                            }
+                        } catch (_: Exception) {
+                            try {
+                                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                            } catch (_: Exception) {
+                            }
+                        }
+                        result.success(true)
+                    }
                     "requestNotificationPermission" -> {
                         if (Build.VERSION.SDK_INT >= 33 &&
                             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
@@ -54,6 +96,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (ScreenState.prefs(this).getBoolean("enabled", false)) ScreenTimeService.start(this)
         handleNotificationIntent(intent)
     }
 
