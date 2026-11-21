@@ -25,6 +25,8 @@ class MainActivity : FlutterActivity() {
                         val th = (call.argument<List<Int>>("thresholds") ?: listOf(30, 45, 60))
                         val reset = call.argument<Int>("resetMin") ?: 30
                         val name = call.argument<String>("name") ?: ""
+                        val student = call.argument<Boolean>("student") ?: false
+                        val exam = call.argument<String>("exam") ?: ""
                         val sp = ScreenState.prefs(this)
                         val wasOn = sp.getBoolean("enabled", false)
                         val ed = sp.edit()
@@ -35,6 +37,8 @@ class MainActivity : FlutterActivity() {
                             .putString("thresholds", th.joinToString(","))
                             .putInt("resetMin", reset)
                             .putString("name", name)
+                            .putBoolean("student", student)
+                            .putString("exam", exam)
                             .apply()
                         ScreenTimeService.start(this)
                         result.success(true)

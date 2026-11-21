@@ -117,6 +117,29 @@ List<Advice> smartAdvice(Measurement m, UserProfile u) {
         source: Sources.eyeStrain));
   }
 
+  // Öğrenciye özel ders önerileri
+  if (u.isStudent) {
+    final exam = u.examName.isEmpty ? '' : ' (${u.examName} hazırlığı)';
+    if (m.hasIndicator && level == FocusLevel.high) {
+      out.add(Advice('📚', 'Şu an zor konular için en iyi zaman$exam. 25 dk ders + 5 dk mola (Pomodoro) ile başla.',
+          reason: 'odak göstergesi yeşil'));
+    } else if (m.hasIndicator && level == FocusLevel.mild) {
+      out.add(Advice('📝', 'Yeni konu yerine tekrar veya soru çözümü yap$exam. 25 dakikada bir 5 dakika mola ver.',
+          reason: 'hafif yorgunluk'));
+    } else if (m.hasIndicator) {
+      out.add(const Advice('🛑', 'Şimdi yeni konuya başlama. 20 dakika mola ver ya da kısa bir yürüyüş yap, sonra tekrar ölç.',
+          reason: 'yüksek yorgunluk', source: Sources.pvt));
+    }
+    if (m.reactionDone && (m.reactionMedianMs ?? 0) > 500) {
+      out.add(const Advice('🎯', 'Dikkatin dağınık görünüyor: zor konular yerine kısa tekrar ve soru çözümü daha verimli olur.',
+          reason: 'tepki süresi uzamış', source: Sources.pvt));
+    }
+    if (u.phoneNearWhileStudy) {
+      out.add(const Advice('📵', 'Ders çalışırken telefonu başka bir odaya veya görmediğin bir yere koy.',
+          reason: 'telefon yakındayken dikkat daha kolay dağılır'));
+    }
+  }
+
   if (m.eyeDone && (m.perclos > 8.4 || m.blinkRate < 6)) {
     out.add(const Advice('👁️',
         '20-20-20 kuralı: 20 dakikada bir, 20 saniye boyunca 6 metre uzağa bak.',
@@ -158,7 +181,7 @@ List<Advice> smartAdvice(Measurement m, UserProfile u) {
         'Saat 16:00\'dan sonra çay/kahve tüketimini azalt; uykuya geçişi geciktirebilir.',
         reason: 'kafein alımı'));
   }
-  if (u.phoneNearWhileStudy && m.offFocusPct > 10) {
+  if (!u.isStudent && u.phoneNearWhileStudy && m.offFocusPct > 10) {
     out.add(const Advice('🔕',
         'Ders çalışırken telefonu başka odaya koy ya da Odak/Rahatsız Etmeyin modunu aç.',
         reason: 'odak kaybı'));

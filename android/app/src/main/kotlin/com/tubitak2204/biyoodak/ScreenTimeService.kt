@@ -243,12 +243,25 @@ class ScreenTimeService : Service() {
     private fun notifyLevel(level: Int, minutes: Int) {
         val name = prefs().getString("name", "") ?: ""
         val hi = if (name.isNotBlank()) "$name, " else ""
-        val (title, body) = when (level) {
-            0 -> "$minutes dakikadır ekrandasın 👀" to "${hi}gözlerini 20 saniye boyunca 6 metre uzağa odakla (20-20-20 kuralı)."
-            1 -> "$minutes dakika oldu ⏳" to "${hi}kalk, bir bardak su iç ve biraz esne. Kısa bir mola odağını tazeler."
-            else -> "$minutes dakika doldu! 🛑" to "${hi}artık telefonu bırakma zamanı. Hadi telefonu kapatıp 30 dakikalık bir mola verelim; sayaç sonra sıfırlanır."
+        val student = prefs().getBoolean("student", false)
+        val exam = prefs().getString("exam", "") ?: ""
+        val examLine = if (exam.isNotBlank()) " $exam hazırlığında her saat değerli." else ""
+        val (title, body) = if (student) {
+            when (level) {
+                0 -> "$minutes dakikadır telefondasın 📚" to "${hi}bu yaklaşık 1 ders saati demek. Kitabına dönmeye ne dersin?"
+                1 -> "$minutes dakika oldu ⏱️" to "${hi}bu sürede bir Pomodoro bloğu yapabilirdin: 25 dk ders + 5 dk mola. Hemen başlayalım mı?"
+                else -> "$minutes dakika doldu! 🛑" to "${hi}telefonu kenara koy ve 30 dakika ders çalış.$examLine"
+            }
+        } else {
+            when (level) {
+                0 -> "$minutes dakikadır ekrandasın 👀" to "${hi}gözlerini 20 saniye boyunca 6 metre uzağa odakla (20-20-20 kuralı)."
+                1 -> "$minutes dakika oldu ⏳" to "${hi}kalk, bir bardak su iç ve biraz esne. Kısa bir mola odağını tazeler."
+                else -> "$minutes dakika doldu! 🛑" to "${hi}artık telefonu bırakma zamanı. Hadi telefonu kapatıp 30 dakikalık bir mola verelim; sayaç sonra sıfırlanır."
+            }
         }
-        val text = if (isNight()) "$body Gece ekran ışığı melatonini baskılayıp uykuya geçişi zorlaştırabilir." else body
+        val nightNote = if (student) " Yarın okul var 🌙 Gece ekran ışığı uykunu bozar, uykusuzluk da ertesi günkü dikkati düşürür."
+            else " Gece ekran ışığı melatonini baskılayıp uykuya geçişi zorlaştırabilir."
+        val text = if (isNight()) "$body$nightNote" else body
         val now = System.currentTimeMillis()
         val n = NotificationCompat.Builder(this, CH_ALERT)
             .setSmallIcon(android.R.drawable.ic_dialog_info)

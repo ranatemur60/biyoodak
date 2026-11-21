@@ -12,8 +12,15 @@ class UserProfile {
   int activity; // 0: az, 1: orta, 2: çok
   int caffeine; // günlük çay/kahve
   bool phoneNearWhileStudy;
+  int purpose; // 0: öğrenci, 1: çalışıyor, 2: genel kullanım
+  int exam; // 0: yok, 1: LGS, 2: YKS
+
+  bool get isStudent => purpose == 0;
+  String get examName => const ['', 'LGS', 'YKS'][exam.clamp(0, 2)];
 
   UserProfile({
+    this.purpose = 0,
+    this.exam = 0,
     this.name = '',
     this.age = 16,
     this.weightKg = 60,
@@ -40,9 +47,13 @@ class UserProfile {
         'activity': activity,
         'caffeine': caffeine,
         'phoneNearWhileStudy': phoneNearWhileStudy,
+        'purpose': purpose,
+        'exam': exam,
       };
 
   factory UserProfile.fromJson(Map<String, dynamic> j) => UserProfile(
+        purpose: (j['purpose'] ?? 0) as int,
+        exam: (j['exam'] ?? 0) as int,
         name: j['name'] ?? '',
         age: (j['age'] ?? 16) as int,
         weightKg: (j['weightKg'] ?? 60).toDouble(),

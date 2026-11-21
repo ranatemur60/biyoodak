@@ -17,7 +17,7 @@ Future<void> main() async {
   await Store.init();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   if (Store.onboarded && Store.breakAlerts) {
-    unawaited(ScreenTime.start(name: Store.profile.name));
+    unawaited(ScreenTime.start(name: Store.profile.name, student: Store.profile.isStudent, exam: Store.profile.examName));
   }
   WebUsage.startTicking();
   runApp(const NeuroVibeApp());
@@ -155,11 +155,18 @@ class MainShellState extends State<MainShell> {
     super.initState();
     webAlerts = WebUsage.alerts.listen((min) {
       if (!mounted) return;
-      final msg = switch (min) {
-        30 => '30 dakikadır ekrandasın 👀 Gözlerini 20 saniye uzağa odakla.',
-        45 => '45 dakika oldu ⏳ Kalk, bir bardak su iç ve biraz esne.',
-        _ => '1 saat doldu! 🛑 Telefonu bırakıp mola verme zamanı.',
-      };
+      final st = Store.profile.isStudent;
+      final msg = st
+          ? switch (min) {
+              30 => '30 dakikadır telefondasın 📚 Bu yaklaşık 1 ders saati demek. Kitabına dönmeye ne dersin?',
+              45 => '45 dakika oldu ⏱️ Bu sürede bir Pomodoro bloğu yapabilirdin: 25 dk ders + 5 dk mola. Hemen başlayalım mı?',
+              _ => '1 saat doldu! 🛑 Telefonu kenara koy ve 30 dakika ders çalış.',
+            }
+          : switch (min) {
+              30 => '30 dakikadır ekrandasın 👀 Gözlerini 20 saniye uzağa odakla.',
+              45 => '45 dakika oldu ⏳ Kalk, bir bardak su iç ve biraz esne.',
+              _ => '1 saat doldu! 🛑 Telefonu bırakıp mola verme zamanı.',
+            };
       showDialog<void>(
           context: context,
           builder: (c) => AlertDialog(

@@ -44,10 +44,12 @@ class ScreenTime {
     } catch (_) {}
   }
 
-  static Future<void> start({String name = ''}) async {
+  static Future<void> start({String name = '', bool student = false, String exam = ''}) async {
     if (!supported) return;
     try {
       await _ch.invokeMethod('start', {
+        'student': student,
+        'exam': exam,
         'thresholds': [30, 45, 60],
         'resetMin': 30, // ekran 30 dk kapalı kalırsa sayaç sıfırlanır
         'name': name,

@@ -67,7 +67,7 @@ class _BreakAlertsCardState extends State<BreakAlertsCard> with WidgetsBindingOb
               Store.breakAlerts = v;
               if (v) {
                 await ScreenTime.requestNotificationPermission();
-                await ScreenTime.start(name: Store.profile.name);
+                await ScreenTime.start(name: Store.profile.name, student: Store.profile.isStudent, exam: Store.profile.examName);
               } else {
                 await ScreenTime.stop();
               }

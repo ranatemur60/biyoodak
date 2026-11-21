@@ -57,10 +57,13 @@ class _ProfileFormState extends State<ProfileForm> {
   Future<void> _save() async {
     u.name = _name.text.trim();
     await Store.saveProfile(u);
+    if (!widget.firstRun && Store.breakAlerts) {
+      await ScreenTime.start(name: u.name, student: u.isStudent, exam: u.examName);
+    }
     if (widget.firstRun) {
       Store.onboarded = true;
       await ScreenTime.requestNotificationPermission();
-      if (Store.breakAlerts) await ScreenTime.start(name: u.name);
+      if (Store.breakAlerts) await ScreenTime.start(name: u.name, student: u.isStudent, exam: u.examName);
     }
     widget.onDone?.call();
   }
@@ -77,6 +80,9 @@ class _ProfileFormState extends State<ProfileForm> {
         const SizedBox(height: 8),
       ],
       _q('Adın (isteğe bağlı)', TextField(controller: _name, decoration: const InputDecoration(border: OutlineInputBorder(), isDense: true))),
+      _q('Uygulamayı ne için kullanıyorsun?', _choice(const ['Öğrenciyim (ders / sınav)', 'Çalışıyorum', 'Genel kullanım'], u.purpose, (i) => u.purpose = i)),
+      if (u.isStudent)
+        _q('Bir sınava hazırlanıyor musun?', _choice(const ['Hayır', 'LGS', 'YKS'], u.exam, (i) => u.exam = i)),
       _q('Yaşın', _slider(u.age.toDouble(), 10, 60, 50, '${u.age}', (v) => setState(() => u.age = v.round()))),
       _q('Kilon (su önerisi için)', _slider(u.weightKg, 30, 120, 90, '${u.weightKg.round()} kg', (v) => setState(() => u.weightKg = v.roundToDouble()))),
       _q('Günde kaç bardak su içiyorsun?', _slider(u.waterGlasses.toDouble(), 0, 15, 15, '${u.waterGlasses} bardak', (v) => setState(() => u.waterGlasses = v.round()))),
