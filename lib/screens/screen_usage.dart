@@ -89,7 +89,7 @@ class _BreakAlertsCardState extends State<BreakAlertsCard> with WidgetsBindingOb
             _warn('Bildirim izni kapalı, bu yüzden uyarılar gelmez.', 'Bildirim iznini aç',
                 () => ScreenTime.openNotifSettings()),
           if (st!.notifAllowed && !st!.batteryOk)
-            _warn('Pil tasarrufu uygulamayı arka planda durdurabilir.', 'Arka planda çalışmasına izin ver',
+            _warn('Pil tasarrufu uygulamayı arka planda durdurabilir. Açılan listede NeuroVibe\'yı bulup "Optimize etme" seç.', 'Arka planda çalışmasına izin ver',
                 () => ScreenTime.requestBattery()),
           const SizedBox(height: 8),
           OutlinedButton.icon(

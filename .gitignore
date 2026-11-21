@@ -47,3 +47,7 @@ app.*.map.json
 # Widget Preview related
 .widget_preview/
 /web/vision/wasm/vision_wasm_internal.wasm.map
+
+# İmza anahtarı (paylaşılmaz)
+/android/key.properties
+*.jks

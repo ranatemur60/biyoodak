@@ -73,28 +73,16 @@ class MainActivity : FlutterActivity() {
                         result.success(true)
                     }
                     "requestBattery" -> {
+                        // Özel izin gerektirmeyen ayar ekranı: pil optimizasyonu listesi
                         try {
-                            if (Build.VERSION.SDK_INT >= 23) {
-                                startActivity(
-                                    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))
-                                )
-                            }
+                            startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
                         } catch (_: Exception) {
                             try {
-                                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                                startActivity(
+                                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+                                )
                             } catch (_: Exception) {
                             }
-                        }
-                        result.success(true)
-                    }
-                    "requestNotificationPermission" -> {
-                        if (Build.VERSION.SDK_INT >= 33 &&
-                            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                            != PackageManager.PERMISSION_GRANTED
-                        ) {
-                            ActivityCompat.requestPermissions(
-                                this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 42
-                            )
                         }
                         result.success(true)
                     }
